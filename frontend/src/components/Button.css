@@ -1,0 +1,218 @@
+/* Button Component Styles */
+
+.button {
+  --btn-shadow: var(--ds-shadow-btn);
+  --btn-shadow-hover: var(--ds-shadow-btn-hover);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 400ms cubic-bezier(0.23, 1, 0.32, 1);
+  overflow: hidden;
+  outline: none;
+  white-space: nowrap;
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.button--primary {
+  background: linear-gradient(135deg, var(--ds-primary) 0%, var(--ds-primary-strong) 100%);
+  color: white;
+  box-shadow: var(--ds-shadow-btn);
+}
+
+.button--primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--ds-shadow-btn-hover);
+}
+
+.button--primary:active:not(:disabled) {
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.button--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button--secondary {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--ds-border);
+  color: var(--ds-primary-strong);
+  box-shadow: none;
+}
+
+.button--secondary:hover:not(:disabled) {
+  background: rgba(45, 143, 74, 0.08);
+  border-color: var(--ds-primary);
+  color: var(--ds-primary);
+}
+
+.button--secondary:active:not(:disabled) {
+  background: rgba(45, 143, 74, 0.12);
+}
+
+.button--secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button--ghost {
+  background: transparent;
+  color: var(--ds-primary-strong);
+  box-shadow: none;
+  border: 1px solid transparent;
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: rgba(45, 143, 74, 0.08);
+}
+
+/* PAGE-HEADER ACTION — used for primary page actions (e.g. "Add"). */
+.button--pageAction {
+  background: linear-gradient(135deg, var(--ds-primary) 0%, var(--ds-primary-strong) 100%);
+  color: white;
+  box-shadow: var(--btn-shadow);
+  height: fit-content;
+}
+
+.button--pageAction:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--btn-shadow-hover);
+}
+
+.button--pageAction:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.button--pageAction:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* SUBMIT — block-level form submit button. */
+.button--submit {
+  background: linear-gradient(135deg, var(--ds-primary) 0%, var(--ds-primary-strong) 100%);
+  color: white;
+  box-shadow: var(--btn-shadow);
+  width: 100%;
+}
+
+.button--submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--btn-shadow-hover);
+}
+
+.button--submit:active:not(:disabled) {
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.button--submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button--full {
+  width: 100%;
+}
+
+/* SIZE VARIANTS */
+.button--sm {
+  padding: 10px 20px;
+  font-size: 0.875rem;
+}
+
+.button--md {
+  padding: 14px 32px;
+  font-size: 0.9375rem;
+}
+
+.button--lg {
+  padding: 18px 40px;
+  font-size: 1rem;
+}
+
+/* ICON STYLING */
+.button__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+}
+
+/* Loading Spinner */
+.button__spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+  margin-right: 8px;
+}
+
+.button__text {
+  display: flex;
+  align-items: center;
+}
+
+.button__text--hidden {
+  visibility: hidden;
+  width: 0;
+  margin: 0;
+}
+
+/* When loading, show only spinner */
+button:disabled .button__text--hidden {
+  visibility: hidden;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .button {
+    font-size: 0.9rem;
+    /* Touch target minimum: 48px */
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .button--sm {
+    padding: 12px 20px;
+  }
+
+  .button--md {
+    padding: 14px 28px;
+  }
+
+  .button--lg {
+    padding: 16px 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .button {
+    width: 100%;
+    font-size: 0.875rem;
+  }
+
+  .button--sm {
+    padding: 12px 16px;
+  }
+
+  .button--md {
+    padding: 14px 24px;
+  }
+
+  .button--lg {
+    padding: 16px 28px;
+  }
+}
+
+[data-theme='dark'] .button {
+  --btn-shadow: var(--ds-shadow-btn-dark);
+  --btn-shadow-hover: var(--ds-shadow-btn-hover-dark);
+}

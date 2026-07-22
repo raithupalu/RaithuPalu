@@ -1,0 +1,26 @@
+const express = require("express");
+const router = express.Router();
+
+const {
+  getNotifications,
+  markAsRead,
+  markAllAsRead,
+  sendBillingReminders,
+} = require("../controllers/notificationController");
+
+const protect = require("../middleware/authMiddleware");
+const authorizeRoles = require("../middleware/roleMiddleware");
+
+// Admin gets notifications
+router.get("/", protect, authorizeRoles("admin"), getNotifications);
+
+// Mark notification as read
+router.put("/:id", protect, authorizeRoles("admin"), markAsRead);
+
+// Mark all notifications as read
+router.put("/", protect, authorizeRoles("admin"), markAllAsRead);
+
+// Send billing reminders
+router.post("/remind", protect, authorizeRoles("admin"), sendBillingReminders);
+
+module.exports = router;

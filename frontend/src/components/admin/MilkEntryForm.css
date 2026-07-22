@@ -1,0 +1,139 @@
+/* Milk Entry Form - modal-ready styles */
+
+/* Standalone card (page) */
+.milk-entry-form-standalone {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  border: 1px solid rgba(76, 175, 80, 0.15);
+  border-radius: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(77, 97, 63, 0.08);
+}
+
+/* Modal variant: remove card chrome */
+.milk-entry-form-modal {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  max-width: 100%;
+}
+
+/* Form layout - 2 column grid */
+.milk-entry-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.calculation-preview,
+.form-submit-btn {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .milk-entry-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid #e5e7eb;
+  font-size: 0.95rem;
+  transition: 0.15s;
+}
+
+.form-input:focus,
+.form-select:focus {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.08);
+}
+
+.form-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.form-select-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #9ca3af;
+}
+
+.quantity-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.quantity-btn {
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.quantity-btn--selected {
+  border-color: #2d5f3f;
+  background: linear-gradient(180deg, #e8f5e9, #f0fbf3);
+  color: #143824;
+}
+
+.calculation-preview {
+  padding: 14px;
+  border-radius: 10px;
+  background: #f6fff6;
+  border: 1px solid rgba(76, 175, 80, 0.06);
+}
+
+.form-submit-btn {
+  height: 48px;
+  border-radius: 12px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1f8a4d, #2db76d);
+  color: white;
+  border: none;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .milk-entry-form-standalone {
+    padding: 16px;
+  }
+
+  .quantity-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-submit-btn {
+    height: 52px;
+  }
+}

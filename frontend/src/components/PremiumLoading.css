@@ -1,0 +1,111 @@
+/* =========================================================
+   Premium Loading Screen
+   - Full-screen overlay, brand-themed background
+   - Centered pulsing logo + wordmark + status text
+   - Pulse: scale 0.9 -> 1.1 -> 0.9, opacity 0.9 -> 1 -> 0.9
+   - Respects prefers-reduced-motion
+   ========================================================= */
+
+.premium-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f1e8 0%, #e8e3d8 100%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.premium-loading__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 20px;
+  padding: 24px;
+}
+
+.premium-loading__logo {
+  width: 140px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: var(--ds-shadow-sm);
+  transform-origin: center center;
+  animation: premium-pulse 1.5s ease-in-out infinite;
+}
+
+.premium-loading__text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.premium-loading__title {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--ds-primary-strong);
+}
+
+.premium-loading__subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ds-text-muted);
+}
+
+.premium-loading__status {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: var(--ds-text-muted);
+}
+
+@keyframes premium-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+}
+
+@media (max-width: 768px) {
+  .premium-loading__logo {
+    width: 116px;
+  }
+
+  .premium-loading__title {
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .premium-loading__logo {
+    width: 100px;
+  }
+
+  .premium-loading__title {
+    font-size: 1.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-loading__logo {
+    animation: none;
+  }
+}
