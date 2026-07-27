@@ -1,5 +1,6 @@
 import React from 'react';
 import DataTable from './DataTable';
+import EntryTypeBadge from './EntryTypeBadge';
 
 const BillingTable = ({ entries = [], totalLitres = 0, totalPrice = 0, month = '' }) => {
   const safeEntries = Array.isArray(entries) ? entries : [];
@@ -55,6 +56,11 @@ const BillingTable = ({ entries = [], totalLitres = 0, totalPrice = 0, month = '
       className: 'price',
       render: (val) => formatPrice(val),
     },
+    {
+      label: 'Type',
+      key: 'entryType',
+      render: (val) => <EntryTypeBadge type={val || 'NORMAL'} />,
+    },
   ];
 
   const footer = (
@@ -65,6 +71,7 @@ const BillingTable = ({ entries = [], totalLitres = 0, totalPrice = 0, month = '
         <td style={{ fontWeight: 600, color: '#2d5f3f' }}>
           {formatPrice(totalPrice)}
         </td>
+        <td></td>
       </tr>
     </tfoot>
   );

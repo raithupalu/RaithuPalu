@@ -47,6 +47,14 @@ async function fetchAdminDashboard() {
       totalExpenses: totalExpenses.toFixed(2),
     },
     recentOrders: orders.slice(0, 8),
+    // Expose raw data arrays to power client-side AI forecasting and statistical models
+    rawData: {
+      users,
+      milk,
+      orders,
+      payments,
+      expenses
+    }
   };
 }
 

@@ -42,8 +42,11 @@ exports.placeOrder = async (req, res, next) => {
       totalPrice,
       session: time,
       date: new Date(),
+      entryType: "ORDER",
       notes: `Auto-created from order ${order._id}`,
     });
+
+    console.log(`[DEBUG] MilkEntry created:\nCustomer: ${req.user.username}\nOrder ID: ${order._id}\nentryType: ORDER`);
 
     await Notification.create({
       userId: null,
@@ -174,6 +177,9 @@ exports.deleteOrder = async (req, res, next) => {
       err.status = 403;
       throw err;
     }
+
+    // Delete corresponding milk entry if it was auto-created from this order
+    await MilkEntry.deleteOne({ notes: `Auto-created from order ${order._id}` });
 
     await Order.findByIdAndDelete(req.params.id);
 

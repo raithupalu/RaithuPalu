@@ -42,6 +42,12 @@ const milkEntrySchema = new mongoose.Schema(
       required: [true, "Date is required"],
       index: true,
     },
+    entryType: {
+      type: String,
+      enum: ["NORMAL", "ORDER"],
+      default: "NORMAL",
+      index: true,
+    },
     notes: String,
   },
   { timestamps: true }

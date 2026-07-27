@@ -6,6 +6,7 @@ const {
   markAsRead,
   markAllAsRead,
   sendBillingReminders,
+  sendBroadcast,
 } = require("../controllers/notificationController");
 
 const protect = require("../middleware/authMiddleware");
@@ -22,5 +23,8 @@ router.put("/", protect, authorizeRoles("admin"), markAllAsRead);
 
 // Send billing reminders
 router.post("/remind", protect, authorizeRoles("admin"), sendBillingReminders);
+
+// Admin sends custom broadcast alerts (WhatsApp + In-App)
+router.post("/broadcast", protect, authorizeRoles("admin"), sendBroadcast);
 
 module.exports = router;

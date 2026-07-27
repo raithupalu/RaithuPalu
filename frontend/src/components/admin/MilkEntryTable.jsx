@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import DataTable from '../DataTable';
+import EntryTypeBadge from '../EntryTypeBadge';
 
 // ✅ Quantity labels
 const quantityLabels = {
@@ -63,6 +64,11 @@ export const MilkEntryTable = ({ entries = [], handleDelete }) => {
       label: 'Session',
       key: 'session',
       render: (val) => <span className="session-badge">{val}</span>,
+    },
+    {
+      label: 'Type',
+      key: 'entryType',
+      render: (val) => <EntryTypeBadge type={val || 'NORMAL'} />,
     },
     {
       label: '',

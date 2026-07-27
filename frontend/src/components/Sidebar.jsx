@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import ThemeToggle from './ThemeToggle';
+import LanguageSelector from './LanguageSelector';
 import icon from '../assets/images/logo/icon.png';
 import {
   FiHome,
@@ -12,25 +14,27 @@ import {
   FiDroplet,
   FiDollarSign,
   FiActivity,
-  FiLogOut
+  FiLogOut,
+  FiMessageSquare
 } from 'react-icons/fi';
 
 export const menuConfig = {
   admin: [
-    { path: '/admin', icon: FiHome, label: 'Dashboard', exact: true },
-    { path: '/admin/milk', icon: FiDroplet, label: 'Milk Entry' },
-    { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo' },
-    { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses' },
-    { path: '/admin/orders', icon: FiBox, label: 'Orders' },
-    { path: '/admin/payments', icon: FiCreditCard, label: 'Payments' },
-    { path: '/admin/customers', icon: FiUsers, label: 'Customers' },
+    { path: '/admin', icon: FiHome, label: 'Dashboard', labelKey: 'dashboard', exact: true },
+    { path: '/admin/milk', icon: FiDroplet, label: 'Milk Entry', labelKey: 'milkEntry' },
+    { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo', labelKey: 'buffalo' },
+    { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses', labelKey: 'expenses' },
+    { path: '/admin/orders', icon: FiBox, label: 'Orders', labelKey: 'orders' },
+    { path: '/admin/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
+    { path: '/admin/customers', icon: FiUsers, label: 'Customers', labelKey: 'customers' },
+    { path: '/admin/broadcast', icon: FiMessageSquare, label: 'Broadcaster', labelKey: 'broadcaster' },
   ],
   customer: [
-    { path: '/customer/dashboard', icon: FiHome, label: 'My Dashboard' },
-    { path: '/customer/milk', icon: FiDroplet, label: 'My Milk Records' },
-    { path: '/customer/orders', icon: FiBox, label: 'Orders' },
-    { path: '/customer/payments', icon: FiCreditCard, label: 'Payments' },
-    { path: '/customer/chart', icon: FiBox, label: 'Analytics' },
+    { path: '/customer/dashboard', icon: FiHome, label: 'My Dashboard', labelKey: 'dashboard' },
+    { path: '/customer/milk', icon: FiDroplet, label: 'My Milk Records', labelKey: 'milkEntry' },
+    { path: '/customer/orders', icon: FiBox, label: 'Orders', labelKey: 'orders' },
+    { path: '/customer/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
+    { path: '/customer/chart', icon: FiBox, label: 'Analytics', labelKey: 'analytics' },
   ],
 };
 
@@ -55,7 +59,8 @@ const menuTheme = {
 
 const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, collapsed }) => {
   const Icon = item.icon || FiHome;
-  const t = menuTheme[theme] || menuTheme.light;
+  const themeConfig = menuTheme[theme] || menuTheme.light;
+  const { t: translate } = useLanguage();
 
   return (
     <NavLink
@@ -70,12 +75,12 @@ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, 
         padding: collapsed ? '0' : '0 16px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderRadius: '10px',
-        color: linkActive ? t.activeColor : t.textMuted,
-        background: linkActive ? t.activeBg : hovered ? t.hoverBg : 'transparent',
+        color: linkActive ? themeConfig.activeColor : themeConfig.textMuted,
+        background: linkActive ? themeConfig.activeBg : hovered ? themeConfig.hoverBg : 'transparent',
         textDecoration: 'none',
         fontWeight: linkActive ? 600 : 500,
-        border: `1px solid ${linkActive ? t.activeBorder : 'transparent'}`,
-        borderLeft: `3px solid ${linkActive ? t.accent : 'transparent'}`,
+        border: `1px solid ${linkActive ? themeConfig.activeBorder : 'transparent'}`,
+        borderLeft: `3px solid ${linkActive ? themeConfig.accent : 'transparent'}`,
         fontFamily: "'Inter', sans-serif",
         fontSize: '0.95rem',
         transition: 'background 0.2s ease, color 0.2s ease',
@@ -94,7 +99,7 @@ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, 
       >
         <Icon size={collapsed ? 22 : 20} />
       </motion.span>
-      {!collapsed && <span className="menu-text">{item.label}</span>}
+      {!collapsed && <span className="menu-text">{translate(item.labelKey)}</span>}
     </NavLink>
   );
 };
@@ -103,6 +108,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t: translate } = useLanguage();
   const [hoveredItem, setHoveredItem] = useState(null);
 
   const menuItems = menuConfig[role] || menuConfig.admin;
@@ -179,10 +185,11 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
         })}
       </nav>
 
-      {/* Theme toggle (persistent, both portals) */}
+      {/* Theme & Language selector (persistent, both portals) */}
       {!collapsed && (
-        <div className="sidebar__theme">
+        <div className="sidebar__theme" style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px' }}>
           <ThemeToggle />
+          <LanguageSelector />
         </div>
       )}
 
@@ -224,7 +231,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
               aria-label="Logout"
             >
               <FiLogOut size={18} />
-              <span className="user-text">Logout</span>
+              <span className="user-text">{translate('logout')}</span>
             </motion.button>
           </>
         )}

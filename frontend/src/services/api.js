@@ -167,4 +167,8 @@ export const pdfService = {
   },
 };
 
+export const notificationService = {
+  broadcast: (data) => api.post('/api/notifications/broadcast', data),
+};
+
 export default api;

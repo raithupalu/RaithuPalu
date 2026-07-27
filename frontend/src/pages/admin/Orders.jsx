@@ -6,6 +6,7 @@ import './AdminPages.css';
 import PageHeader from '../../components/PageHeader';
 import Button from '../../components/Button';
 import DataTable from '../../components/DataTable';
+import Modal from '../../components/Modal';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -17,6 +18,11 @@ const AdminOrders = () => {
     confirmed: 0,
     cancelled: 0
   });
+
+  // Modal deletion states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -65,18 +71,38 @@ const AdminOrders = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDeleteClick = (id) => {
     if (!id) {
       console.error('Invalid order ID');
       return;
     }
-    if (window.confirm('Delete this order?')) {
-      try {
-        await orderService.delete(id);
-        setOrders(prev => prev.filter(o => o._id !== id));
-      } catch (error) {
-        console.error('Error deleting order:', error);
+    setOrderToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!orderToDelete) return;
+    try {
+      setDeletingId(orderToDelete);
+      await orderService.delete(orderToDelete);
+      setOrders(prev => prev.filter(o => o._id !== orderToDelete));
+      
+      // Update stats dynamically on successful deletion
+      const deletedOrder = orders.find(o => o._id === orderToDelete);
+      if (deletedOrder) {
+        const status = deletedOrder.status || 'pending';
+        setStats(prev => ({
+          ...prev,
+          [status]: Math.max(0, prev[status] - 1)
+        }));
       }
+      
+      setDeleteModalOpen(false);
+      setOrderToDelete(null);
+    } catch (error) {
+      console.error('Error deleting order:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -294,7 +320,7 @@ const AdminOrders = () => {
                     </>
                   )}
                   <motion.button
-                    onClick={() => handleDelete(row._id)}
+                    onClick={() => handleDeleteClick(row._id)}
                     className="btn-delete"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -308,6 +334,22 @@ const AdminOrders = () => {
           ]}
         />
       </motion.div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setOrderToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Order"
+        message="Are you sure you want to delete this order? This action cannot be undone and will also automatically delete the corresponding milk delivery record in the customer's delivery history."
+        confirmText={deletingId ? "Deleting..." : "Delete Order"}
+        cancelText="Cancel"
+        type="danger"
+        confirmDisabled={Boolean(deletingId)}
+      />
     </div>
   );
 };

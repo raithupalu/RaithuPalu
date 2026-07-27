@@ -27,19 +27,6 @@ function formatNumber(num) {
  * Generate a professional PDF invoice for milk billing
  * @param {string} filePath - Output file path
  * @param {object} data - Invoice data
- * @param {string} data.customerName - Customer name
- * @param {string} data.customerPhone - Customer phone (optional)
- * @param {string} data.invoiceNumber - Unique invoice number
- * @param {string} data.billingMonth - Billing month label (e.g., "April 2026")
- * @param {string} data.billingPeriodStart - Start date
- * @param {string} data.billingPeriodEnd - End date
- * @param {Array} data.entries - Milk entry records
- * @param {number} data.totalLitres - Total litres
- * @param {number} data.totalAmount - Total amount due
- * @param {number} data.pricePerLitre - Price per litre
- * @param {string} data.companyName - Company name
- * @param {object} data.companyAddress - Company address
- * @param {string} data.issueDate - Invoice issue date
  */
 function generateInvoicePDF(filePath, data) {
   return new Promise((resolve, reject) => {
@@ -123,10 +110,11 @@ function generateInvoicePDF(filePath, data) {
       // Table header
       const tableTop = yPos;
       const colDate = leftMargin;
-      const colSession = leftMargin + 90;
-      const colQty = leftMargin + 200;
-      const colPrice = leftMargin + 260;
-      const colTotal = leftMargin + 350;
+      const colSession = leftMargin + 80;
+      const colQty = leftMargin + 170;
+      const colPrice = leftMargin + 240;
+      const colTotal = leftMargin + 320;
+      const colType = leftMargin + 410;
 
       doc.fontSize(smallFontSize).font('Helvetica-Bold').fillColor('#000');
       doc.text('Date', colDate, tableTop);
@@ -134,6 +122,7 @@ function generateInvoicePDF(filePath, data) {
       doc.text('Quantity (L)', colQty, tableTop);
       doc.text('Price/L (₹)', colPrice, tableTop);
       doc.text('Amount (₹)', colTotal, tableTop);
+      doc.text('Type', colType, tableTop);
 
       // Horizontal line under header
       doc.moveTo(leftMargin, tableTop + 15).lineTo(rightMargin, tableTop + 15)
@@ -149,12 +138,14 @@ function generateInvoicePDF(filePath, data) {
         const quantity = formatNumber(entry.quantity || 0);
         const price = formatNumber(entry.pricePerLitre || 0);
         const total = formatNumber(entry.totalPrice || 0);
+        const typeText = entry.entryType === 'ORDER' ? 'Ordered' : 'Normal';
 
         doc.text(date, colDate, yPos);
         doc.text(session, colSession, yPos);
         doc.text(quantity, colQty, yPos, { align: 'right' });
         doc.text(price, colPrice, yPos, { align: 'right' });
         doc.text(total, colTotal, yPos, { align: 'right' });
+        doc.text(typeText, colType, yPos);
 
         yPos += 16;
 
@@ -214,7 +205,6 @@ function generateInvoicePDF(filePath, data) {
 
 /**
  * Clean up temporary invoice files
- * @param {Array<string>} files - Array of file paths to delete
  */
 function cleanupTempFiles(files = []) {
   const allFiles = fs.existsSync(TEMP_DIR) ? fs.readdirSync(TEMP_DIR) : [];
@@ -228,25 +218,18 @@ function cleanupTempFiles(files = []) {
     const filepath = path.join(TEMP_DIR, filename);
     try {
       const stats = fs.statSync(filepath);
-      // Delete if older than 7 days OR explicitly listed
       if (files.length > 0 || (now - stats.mtimeMs) > maxAge) {
         fs.unlinkSync(filepath);
         cleaned++;
       }
     } catch (e) {
-      // File might not exist, ignore
+      // ignore
     }
   });
 
   return cleaned;
 }
 
-/**
- * Generate unique filename for invoice
- * @param {string} customerId - Customer ID
- * @param {string} billingMonth - Billing month label
- * @returns {string} - Generated filename
- */
 function generateInvoiceFilename(customerId, billingMonth) {
   const monthSlug = billingMonth.toLowerCase().replace(/\s+/g, '-');
   const timestamp = Date.now();

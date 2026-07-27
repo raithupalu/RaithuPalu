@@ -24,10 +24,10 @@ const CustomerPayments = () => {
   const milkQuery = useQuery({
     queryKey: ['customer-milk', selectedMonth],
     queryFn: async () => {
-      const response = await milkService.getByUserAndMonth(user._id, selectedMonth);
+      const response = await milkService.getByUserAndMonth(user.id, selectedMonth);
       return response.data;
     },
-    enabled: !!user?._id && !!selectedMonth,
+    enabled: !!user?.id && !!selectedMonth,
   });
 
   const handleMonthChange = (e) => {
