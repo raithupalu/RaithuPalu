@@ -233,8 +233,12 @@
   z-index: 210;
 }
 
+.mobile-drawer .sidebar {
+  display: flex !important;
+}
+
 /* ---------------- Responsive breakpoints ---------------- */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .layout {
     flex-direction: column;
   }
@@ -318,7 +322,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .layout .stats-grid {
     grid-template-columns: 1fr;
     gap: 12px;

@@ -1,0 +1,18 @@
+diff a/frontend/src/services/api.js b/frontend/src/services/api.js	(rejected hunks)
+@@ -167,4 +167,15 @@ export const pdfService = {
+   },
+ };
+ 
++export const notificationService = {
++  broadcast: (data) => api.post('/api/notifications/broadcast', data),
++};
++
++export const subscriptionService = {
++  getMy: () => api.get('/api/subscriptions/my'),
++  update: (data) => api.put('/api/subscriptions/my', data),
++  toggleVacation: (isActive) => api.post('/api/subscriptions/my/vacation', { isActive }),
++  getAll: () => api.get('/api/subscriptions'),
++};
++
+ export default api;
+\ No newline at end of file

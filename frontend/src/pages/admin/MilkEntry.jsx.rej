@@ -1,0 +1,203 @@
+diff a/frontend/src/pages/admin/MilkEntry.jsx b/frontend/src/pages/admin/MilkEntry.jsx	(rejected hunks)
+@@ -1,4 +1,4 @@
+-import React, { useState, useCallback } from 'react';
++import React, { useState, useCallback, useMemo } from 'react';
+ import { AnimatePresence } from 'framer-motion';
+ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+ import { Link } from 'react-router-dom';
+@@ -20,6 +20,8 @@ const MilkEntry = () => {
+   const queryClient = useQueryClient();
+ 
+   const [showModal, setShowModal] = useState(false);
++  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'normal' | 'order'
++  const [sortOrder, setSortOrder] = useState('none'); // 'none' | 'normal' | 'order'
+ 
+   // Form state for modal
+   const [formData, setFormData] = useState({
+@@ -109,6 +111,7 @@ const MilkEntry = () => {
+       session: data.session,
+       date: dateOnly,
+       totalPrice: data.total,
++      entryType: "NORMAL", // Explicit manually entered type
+     });
+   };
+ 
+@@ -129,15 +132,68 @@ const MilkEntry = () => {
+     setSubmitStatus(null);
+   };
+ 
+-  // Calculate summary stats
+-  const summaryStats = listQuery.data ? (() => {
++  // Filter and sort entries dynamically
++  const processedEntries = useMemo(() => {
++    if (!listQuery.data?.entries) return [];
++    let result = [...listQuery.data.entries];
++    
++    // 1. Filter by type
++    if (typeFilter === 'normal') {
++      result = result.filter(e => !e.entryType || e.entryType.toUpperCase() === 'NORMAL');
++    } else if (typeFilter === 'order') {
++      result = result.filter(e => e.entryType && e.entryType.toUpperCase() === 'ORDER');
++    }
++    
++    // 2. Sort by type
++    if (sortOrder === 'normal') {
++      result.sort((a, b) => {
++        const typeA = (a.entryType || 'NORMAL').toUpperCase();
++        const typeB = (b.entryType || 'NORMAL').toUpperCase();
++        if (typeA === 'NORMAL' && typeB === 'ORDER') return -1;
++        if (typeA === 'ORDER' && typeB === 'NORMAL') return 1;
++        return 0;
++      });
++    } else if (sortOrder === 'order') {
++      result.sort((a, b) => {
++        const typeA = (a.entryType || 'NORMAL').toUpperCase();
++        const typeB = (b.entryType || 'NORMAL').toUpperCase();
++        if (typeA === 'ORDER' && typeB === 'NORMAL') return -1;
++        if (typeA === 'NORMAL' && typeB === 'ORDER') return 1;
++        return 0;
++      });
++    }
++    
++    return result;
++  }, [listQuery.data, typeFilter, sortOrder]);
++
++  // Calculate summary stats including custom sub-types requested
++  const summaryStats = useMemo(() => {
++    if (!listQuery.data?.entries) return null;
+     const { entries } = listQuery.data;
+     const totalEntries = entries.length;
+     const totalLitres = entries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+     const totalAmount = entries.reduce((sum, e) => sum + (e.totalPrice || 0), 0);
+     const avgCollection = totalEntries > 0 ? totalLitres / totalEntries : 0;
+-    return { totalEntries, totalLitres, totalAmount, avgCollection };
+-  })() : null;
++
++    // Ordered vs Normal counts
++    const normalEntriesCount = entries.filter(e => !e.entryType || e.entryType.toUpperCase() === 'NORMAL').length;
++    const orderedEntriesCount = entries.filter(e => e.entryType && e.entryType.toUpperCase() === 'ORDER').length;
++
++    // Ordered vs Normal volumes
++    const totalNormalMilk = entries.filter(e => !e.entryType || e.entryType.toUpperCase() === 'NORMAL').reduce((sum, e) => sum + (e.quantity || 0), 0);
++    const totalOrderedMilk = entries.filter(e => e.entryType && e.entryType.toUpperCase() === 'ORDER').reduce((sum, e) => sum + (e.quantity || 0), 0);
++
++    return {
++      totalEntries,
++      totalLitres,
++      totalAmount,
++      avgCollection,
++      normalEntries: normalEntriesCount,
++      orderedEntries: orderedEntriesCount,
++      totalNormalMilk,
++      totalOrderedMilk
++    };
++  }, [listQuery.data]);
+ 
+   if (listQuery.isPending) return <DashboardSkeleton />;
+ 
+@@ -151,7 +207,7 @@ const MilkEntry = () => {
+     );
+   }
+ 
+-  const { entries, users } = listQuery.data;
++  const { users } = listQuery.data;
+ 
+   return (
+     <div className="admin-page">
+@@ -168,6 +224,9 @@ const MilkEntry = () => {
+               {summaryStats?.totalEntries}
+               <span className="stat-unit"> records</span>
+             </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Normal: <strong>{summaryStats?.normalEntries}</strong> | Ordered: <strong>{summaryStats?.orderedEntries}</strong>
++            </div>
+           </div>
+         </div>
+ 
+@@ -177,9 +236,12 @@ const MilkEntry = () => {
+           <div className="stat-content">
+             <div className="stat-label">Total Litres</div>
+             <div className="stat-value">
+-              {summaryStats?.totalLitres}
++              {summaryStats?.totalLitres.toFixed(1)}
+               <span className="stat-unit"> L</span>
+             </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Normal: <strong>{summaryStats?.totalNormalMilk.toFixed(1)}L</strong> | Ordered: <strong>{summaryStats?.totalOrderedMilk.toFixed(1)}L</strong>
++            </div>
+           </div>
+         </div>
+ 
+@@ -189,7 +251,10 @@ const MilkEntry = () => {
+           <div className="stat-content">
+             <div className="stat-label">Total Amount</div>
+             <div className="stat-value">
+-              ₹{summaryStats?.totalAmount}
++              ₹{summaryStats?.totalAmount.toFixed(2)}
++            </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Calculations unchanged
+             </div>
+           </div>
+         </div>
+@@ -203,10 +268,44 @@ const MilkEntry = () => {
+               {summaryStats?.avgCollection.toFixed(1)}
+               <span className="stat-unit"> L</span>
+             </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Dairy herd production summary
++            </div>
+           </div>
+         </div>
+       </div>
+ 
++      {/* Filter and sorting row */}
++      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
++        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
++          <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Type Filter:</label>
++          <select
++            value={typeFilter}
++            onChange={(e) => setTypeFilter(e.target.value)}
++            className="filter-select"
++            style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '120px' }}
++          >
++            <option value="all">All</option>
++            <option value="normal">Normal Only</option>
++            <option value="order">Ordered Only</option>
++          </select>
++        </div>
++
++        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
++          <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sort:</label>
++          <select
++            value={sortOrder}
++            onChange={(e) => setSortOrder(e.target.value)}
++            className="filter-select"
++            style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '140px' }}
++          >
++            <option value="none">Default (Date)</option>
++            <option value="normal">Normal First</option>
++            <option value="order">Ordered First</option>
++          </select>
++        </div>
++      </div>
++
+       {/* Recent Entries Table */}
+       <div className="page-card">
+         <div className="card-header">
+@@ -216,7 +315,7 @@ const MilkEntry = () => {
+           </Link>
+         </div>
+         <MilkEntryTable
+-          entries={entries}
++          entries={processedEntries}
+           handleDelete={handleDelete}
+           isDeleting={deleteMutation.isPending}
+         />
+@@ -247,4 +346,4 @@ const MilkEntry = () => {
+   );
+ };
+ 
+-export default MilkEntry;
++export default MilkEntry;
+\ No newline at end of file

@@ -35,6 +35,29 @@ const AppLayout = ({ role = 'admin' }) => {
     if (!isMobile) setIsOpen(false);
   }, [isMobile]);
 
+  // Prevent body scrolling when mobile drawer is open
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobile, isOpen]);
+
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Command/Ctrl + K opens search.
   useEffect(() => {
     const onKey = (e) => {
@@ -48,6 +71,7 @@ const AppLayout = ({ role = 'admin' }) => {
   }, []);
 
   const closeDrawer = () => setIsOpen(false);
+  const toggleDrawer = () => setIsOpen(prev => !prev);
 
   return (
     <div className="layout">
@@ -61,8 +85,9 @@ const AppLayout = ({ role = 'admin' }) => {
         <header className="topbar">
           <button
             className="topbar__toggle"
-            onClick={() => setIsOpen(true)}
-            aria-label="Open menu"
+            onClick={toggleDrawer}
+            aria-label="Toggle navigation menu"
+            aria-expanded={isOpen}
           >
             <MenuIcon />
           </button>
@@ -70,7 +95,7 @@ const AppLayout = ({ role = 'admin' }) => {
           <ThemeToggle />
           <button
             className="topbar__avatar"
-            onClick={() => setIsOpen(true)}
+            onClick={toggleDrawer}
             aria-label="Open profile"
           >
             {user?.username?.charAt(0)?.toUpperCase()}
@@ -100,7 +125,7 @@ const AppLayout = ({ role = 'admin' }) => {
               role="dialog"
               aria-modal="true"
             >
-              <Sidebar role={role} theme={theme} isMobile width={280} />
+              <Sidebar role={role} theme={theme} isMobile width={280} onItemClick={closeDrawer} />
             </motion.div>
           </>
         )}

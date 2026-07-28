@@ -37,7 +37,7 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
     doc.addImage(dataUrl, 'PNG', logoX, y, logoWidth, logoHeight);
     y += logoHeight + 8;
   } catch (err) {
-    // Fall back to text-only header if logo fails
+    // Logo is decorative; fall back to text-only header if it fails to load.
   }
 
   doc.setFontSize(20);

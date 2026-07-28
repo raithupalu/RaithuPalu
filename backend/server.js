@@ -135,6 +135,7 @@ app.use("/api/pdf", require("./routes/pdfRoutes"));
 app.use("/api/buffalo", protect, authorizeRoles("admin"), require("./routes/buffaloRoutes"));
 app.use("/api/expenses", protect, authorizeRoles("admin"), require("./routes/expenseRoutes"));
 app.use("/api/users", protect, authorizeRoles("admin"), require("./routes/userRoutes"));
+app.use("/api/subscriptions", require("./routes/subscriptionRoutes"));
 
 // ─────────────────────────────────────────────
 // MULTER (SECURED)
@@ -248,3 +249,4 @@ connectDB().then(async () => {
 });
 // optional auto billing
 require('./utils/autoBilling');
+require('./utils/dailyDeliveries');

@@ -1,0 +1,102 @@
+diff a/backend/controllers/milkController.js b/backend/controllers/milkController.js	(rejected hunks)
+@@ -55,10 +55,19 @@ exports.addMilkEntry = async (req, res, next) => {
+       totalPrice,
+       session,
+       date: entryDate,
++      entryType: "NORMAL",
+       notes,
+     });
+ 
+-    res.status(201).json({ message: "Milk entry added", entry });
++    console.log(`[DEBUG] MilkEntry created:\nCustomer: ${userId}\nOrder ID: N/A (Manual Entry)\nentryType: NORMAL`);
++
++    res.status(201).json({ 
++      message: "Milk entry added", 
++      entry: {
++        ...entry.toObject(),
++        entryType: entry.entryType || "NORMAL"
++      } 
++    });
+   } catch (error) {
+     next(error);
+   }
+@@ -75,9 +84,17 @@ exports.getMyMilkEntries = async (req, res, next) => {
+       MilkEntry.countDocuments({ userId: req.user.id }),
+     ]);
+ 
++    const processedEntries = entries.map(entry => {
++      const obj = entry.toObject ? entry.toObject() : entry;
++      return {
++        ...obj,
++        entryType: obj.entryType || "NORMAL"
++      };
++    });
++
+     res.json({
+       success: true,
+-      data: entries,
++      data: processedEntries,
+       pagination: {
+         total,
+         page,
+@@ -105,8 +122,16 @@ exports.getAllMilkEntries = async (req, res, next) => {
+       MilkEntry.countDocuments(),
+     ]);
+ 
++    const processedEntries = entries.map(entry => {
++      const obj = entry.toObject ? entry.toObject() : entry;
++      return {
++        ...obj,
++        entryType: obj.entryType || "NORMAL"
++      };
++    });
++
+     res.json({
+-      data: entries,
++      data: processedEntries,
+       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+     });
+   } catch (error) {
+@@ -131,7 +156,16 @@ exports.getLastMilkEntryForUser = async (req, res, next) => {
+     }
+ 
+     const data = await MilkEntry.findOne({ userId: id }).sort({ date: -1 });
+-    res.json(data || null);
++    
++    if (data) {
++      const obj = data.toObject ? data.toObject() : data;
++      res.json({
++        ...obj,
++        entryType: obj.entryType || "NORMAL"
++      });
++    } else {
++      res.json(null);
++    }
+   } catch (error) {
+     next(error);
+   }
+@@ -205,8 +239,13 @@ exports.getMilkByUserAndMonth = async (req, res, next) => {
+ 
+     console.info(`Found ${entries.length} milk entries for ${userId} in ${month}`);
+ 
+-    const totalLitres = entries.reduce((sum, item) => sum + (item.quantity || 0), 0);
+-    const totalPrice = entries.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
++    const processedEntries = entries.map(item => ({
++      ...item,
++      entryType: item.entryType || "NORMAL"
++    }));
++
++    const totalLitres = processedEntries.reduce((sum, item) => sum + (item.quantity || 0), 0);
++    const totalPrice = processedEntries.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+ 
+     const customer = user
+       ? { username: user.username, email: user.email, phone: user.phone }
+@@ -216,7 +255,7 @@ exports.getMilkByUserAndMonth = async (req, res, next) => {
+       success: true,
+       customer,
+       month,
+-      entries: entries || [],
++      entries: processedEntries || [],
+       totals: {
+         totalLitres: totalLitres || 0,
+         totalPrice: totalPrice || 0,

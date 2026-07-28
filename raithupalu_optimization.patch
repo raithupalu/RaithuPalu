@@ -1,0 +1,3405 @@
+diff --git a/backend/controllers/milkController.js b/backend/controllers/milkController.js
+index 2fca39e..1204f1a 100644
+--- a/backend/controllers/milkController.js
++++ b/backend/controllers/milkController.js
+@@ -55,10 +55,19 @@ exports.addMilkEntry = async (req, res, next) => {
+       totalPrice,
+       session,
+       date: entryDate,
++      entryType: "NORMAL",
+       notes,
+     });
+ 
+-    res.status(201).json({ message: "Milk entry added", entry });
++    console.log(`[DEBUG] MilkEntry created:\nCustomer: ${userId}\nOrder ID: N/A (Manual Entry)\nentryType: NORMAL`);
++
++    res.status(201).json({ 
++      message: "Milk entry added", 
++      entry: {
++        ...entry.toObject(),
++        entryType: entry.entryType || "NORMAL"
++      } 
++    });
+   } catch (error) {
+     next(error);
+   }
+@@ -75,9 +84,17 @@ exports.getMyMilkEntries = async (req, res, next) => {
+       MilkEntry.countDocuments({ userId: req.user.id }),
+     ]);
+ 
++    const processedEntries = entries.map(entry => {
++      const obj = entry.toObject ? entry.toObject() : entry;
++      return {
++        ...obj,
++        entryType: obj.entryType || "NORMAL"
++      };
++    });
++
+     res.json({
+       success: true,
+-      data: entries,
++      data: processedEntries,
+       pagination: {
+         total,
+         page,
+@@ -105,8 +122,16 @@ exports.getAllMilkEntries = async (req, res, next) => {
+       MilkEntry.countDocuments(),
+     ]);
+ 
++    const processedEntries = entries.map(entry => {
++      const obj = entry.toObject ? entry.toObject() : entry;
++      return {
++        ...obj,
++        entryType: obj.entryType || "NORMAL"
++      };
++    });
++
+     res.json({
+-      data: entries,
++      data: processedEntries,
+       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+     });
+   } catch (error) {
+@@ -131,7 +156,16 @@ exports.getLastMilkEntryForUser = async (req, res, next) => {
+     }
+ 
+     const data = await MilkEntry.findOne({ userId: id }).sort({ date: -1 });
+-    res.json(data || null);
++    
++    if (data) {
++      const obj = data.toObject ? data.toObject() : data;
++      res.json({
++        ...obj,
++        entryType: obj.entryType || "NORMAL"
++      });
++    } else {
++      res.json(null);
++    }
+   } catch (error) {
+     next(error);
+   }
+@@ -205,8 +239,13 @@ exports.getMilkByUserAndMonth = async (req, res, next) => {
+ 
+     console.info(`Found ${entries.length} milk entries for ${userId} in ${month}`);
+ 
+-    const totalLitres = entries.reduce((sum, item) => sum + (item.quantity || 0), 0);
+-    const totalPrice = entries.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
++    const processedEntries = entries.map(item => ({
++      ...item,
++      entryType: item.entryType || "NORMAL"
++    }));
++
++    const totalLitres = processedEntries.reduce((sum, item) => sum + (item.quantity || 0), 0);
++    const totalPrice = processedEntries.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+ 
+     const customer = user
+       ? { username: user.username, email: user.email, phone: user.phone }
+@@ -216,7 +255,7 @@ exports.getMilkByUserAndMonth = async (req, res, next) => {
+       success: true,
+       customer,
+       month,
+-      entries: entries || [],
++      entries: processedEntries || [],
+       totals: {
+         totalLitres: totalLitres || 0,
+         totalPrice: totalPrice || 0,
+diff --git a/backend/controllers/notificationController.js b/backend/controllers/notificationController.js
+index d4f6e5f..262d34e 100644
+--- a/backend/controllers/notificationController.js
++++ b/backend/controllers/notificationController.js
+@@ -1,10 +1,11 @@
+ const Notification = require("../models/Notification");
+ const Payment = require("../models/Payment");
++const User = require("../models/User");
++const { sendWhatsAppMessageWithRetry } = require("../utils/whatsappService");
+ 
+ // 👑 Admin gets notifications with pagination
+ exports.getNotifications = async (req, res) => {
+   try {
+-    // FIX: Add pagination parameters
+     const page = Math.max(1, Number(req.query.page) || 1);
+     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+     const skip = (page - 1) * limit;
+@@ -66,8 +67,6 @@ exports.sendBillingReminders = async (req, res) => {
+     const reminders = [];
+     for (const payment of pendingPayments) {
+       if (payment.userId) {
+-        // FIX: Use 'payment' type instead of hardcoded 'reminder'
+-        // Valid types: 'order', 'payment', 'milk', 'system', 'alert'
+         const notification = await Notification.create({
+           userId: payment.userId._id,
+           message: `Payment reminder: ₹${payment.pending.toFixed(2)} pending for ${payment.month}`,
+@@ -86,4 +85,85 @@ exports.sendBillingReminders = async (req, res) => {
+     console.error("Error sending reminders:", error);
+     res.status(500).json({ message: "Error sending reminders" });
+   }
+-};
+\ No newline at end of file
++};
++
++// 👑 Send custom broadcast alerts (Admin only)
++exports.sendBroadcast = async (req, res, next) => {
++  try {
++    const { targetUserId, message } = req.body;
++
++    if (!message || String(message).trim().length === 0) {
++      const err = new Error("Message body is required.");
++      err.status = 400;
++      throw err;
++    }
++
++    let targetUsers = [];
++
++    if (targetUserId && targetUserId !== "all") {
++      const user = await User.findById(targetUserId);
++      if (!user) {
++        const err = new Error("Target customer not found.");
++        err.status = 404;
++        throw err;
++      }
++      targetUsers = [user];
++    } else {
++      targetUsers = await User.find({ role: "customer", isActive: true });
++    }
++
++    if (targetUsers.length === 0) {
++      const err = new Error("No target active customers found to broadcast to.");
++      err.status = 400;
++      throw err;
++    }
++
++    const results = [];
++    
++    for (const user of targetUsers) {
++      // 1. Create in-app notification
++      await Notification.create({
++        userId: user._id,
++        message: message,
++        type: "alert",
++      });
++
++      // 2. Trigger Twilio WhatsApp alert
++      let whatsappSent = false;
++      let whatsappError = null;
++
++      if (user.phone) {
++        try {
++          const waResult = await sendWhatsAppMessageWithRetry(user.phone, message, null, {
++            broadcast: true,
++            recipient: user.username
++          });
++          whatsappSent = waResult.success;
++          if (!waResult.success) {
++            whatsappError = waResult.error;
++          }
++        } catch (err) {
++          whatsappError = err.message;
++        }
++      } else {
++        whatsappError = "No phone number available.";
++      }
++
++      results.push({
++        userId: user._id,
++        username: user.username,
++        whatsappSent,
++        error: whatsappError
++      });
++    }
++
++    res.json({
++      success: true,
++      message: `Broadcast processed for ${targetUsers.length} clients.`,
++      results
++    });
++
++  } catch (error) {
++    next(error);
++  }
++};
+diff --git a/backend/controllers/orderController.js b/backend/controllers/orderController.js
+index d07b333..13c77b9 100644
+--- a/backend/controllers/orderController.js
++++ b/backend/controllers/orderController.js
+@@ -42,9 +42,12 @@ exports.placeOrder = async (req, res, next) => {
+       totalPrice,
+       session: time,
+       date: new Date(),
++      entryType: "ORDER",
+       notes: `Auto-created from order ${order._id}`,
+     });
+ 
++    console.log(`[DEBUG] MilkEntry created:\nCustomer: ${req.user.username}\nOrder ID: ${order._id}\nentryType: ORDER`);
++
+     await Notification.create({
+       userId: null,
+       message: `New order from ${req.user.username}: ${quantity}L for ${time}`,
+@@ -175,6 +178,9 @@ exports.deleteOrder = async (req, res, next) => {
+       throw err;
+     }
+ 
++    // Delete corresponding milk entry if it was auto-created from this order
++    await MilkEntry.deleteOne({ notes: `Auto-created from order ${order._id}` });
++
+     await Order.findByIdAndDelete(req.params.id);
+ 
+     res.json({ message: "Order deleted successfully" });
+diff --git a/backend/controllers/subscriptionController.js b/backend/controllers/subscriptionController.js
+new file mode 100644
+index 0000000..10adfe3
+--- /dev/null
++++ b/backend/controllers/subscriptionController.js
+@@ -0,0 +1,86 @@
++const Subscription = require("../models/Subscription");
++
++// ✅ Get logged-in user's subscription
++exports.getMySubscription = async (req, res, next) => {
++  try {
++    let subscription = await Subscription.findOne({ userId: req.user.id });
++
++    // If no subscription exists yet, create a default placeholder
++    if (!subscription) {
++      subscription = await Subscription.create({
++        userId: req.user.id,
++        quantity: 1,
++        timeSlot: "morning",
++        frequency: "daily",
++        isActive: true,
++      });
++    }
++
++    res.json(subscription);
++  } catch (error) {
++    next(error);
++  }
++};
++
++// ✅ Update subscription (Quantity, Time slot, Frequency, or active status)
++exports.updateMySubscription = async (req, res, next) => {
++  try {
++    const { quantity, timeSlot, frequency, isActive } = req.body;
++
++    const updateData = {};
++    if (quantity !== undefined) updateData.quantity = Number(quantity);
++    if (timeSlot !== undefined) updateData.timeSlot = timeSlot;
++    if (frequency !== undefined) updateData.frequency = frequency;
++    if (isActive !== undefined) updateData.isActive = Boolean(isActive);
++    updateData.updatedAt = new Date();
++
++    const subscription = await Subscription.findOneAndUpdate(
++      { userId: req.user.id },
++      updateData,
++      { new: true, upsert: true, setDefaultsOnInsert: true }
++    );
++
++    res.json({
++      message: "Subscription updated successfully",
++      subscription,
++    });
++  } catch (error) {
++    next(error);
++  }
++};
++
++// ✅ Toggle Vacation Mode (Pause/Resume Deliveries)
++exports.toggleVacationMode = async (req, res, next) => {
++  try {
++    const { isActive } = req.body;
++
++    if (isActive === undefined) {
++      return res.status(400).json({ message: "Active status is required" });
++    }
++
++    const subscription = await Subscription.findOneAndUpdate(
++      { userId: req.user.id },
++      { isActive: Boolean(isActive), updatedAt: new Date() },
++      { new: true, upsert: true, setDefaultsOnInsert: true }
++    );
++
++    res.json({
++      message: isActive ? "Deliveries resumed successfully!" : "Vacation mode activated. Deliveries paused.",
++      subscription,
++    });
++  } catch (error) {
++    next(error);
++  }
++};
++
++// 👑 Get all customer subscriptions (Admin only)
++exports.getAllSubscriptions = async (req, res, next) => {
++  try {
++    const list = await Subscription.find()
++      .populate("userId", "username email phone")
++      .sort({ updatedAt: -1 });
++    res.json(list);
++  } catch (error) {
++    next(error);
++  }
++};
+diff --git a/backend/models/MilkEntry.js b/backend/models/MilkEntry.js
+index f69f8ab..51b592d 100644
+--- a/backend/models/MilkEntry.js
++++ b/backend/models/MilkEntry.js
+@@ -42,6 +42,12 @@ const milkEntrySchema = new mongoose.Schema(
+       required: [true, "Date is required"],
+       index: true,
+     },
++    entryType: {
++      type: String,
++      enum: ["NORMAL", "ORDER"],
++      default: "NORMAL",
++      index: true,
++    },
+     notes: String,
+   },
+   { timestamps: true }
+diff --git a/backend/models/Subscription.js b/backend/models/Subscription.js
+new file mode 100644
+index 0000000..c9aa100
+--- /dev/null
++++ b/backend/models/Subscription.js
+@@ -0,0 +1,42 @@
++const mongoose = require("mongoose");
++
++const subscriptionSchema = new mongoose.Schema(
++  {
++    userId: {
++      type: mongoose.Schema.Types.ObjectId,
++      ref: "User",
++      required: [true, "User ID is required"],
++      unique: true, // A customer has one active subscription plan
++      index: true,
++    },
++    quantity: {
++      type: Number,
++      required: [true, "Quantity is required"],
++      min: [0.1, "Quantity must be at least 0.1 liters"],
++      default: 1,
++    },
++    timeSlot: {
++      type: String,
++      enum: ["morning", "evening"],
++      default: "morning",
++    },
++    frequency: {
++      type: String,
++      enum: ["daily", "alternate", "weekly"],
++      default: "daily",
++    },
++    isActive: {
++      type: Boolean,
++      default: true,
++      index: true, // Fast querying for midnight delivery logging
++    },
++    notes: String,
++    updatedAt: {
++      type: Date,
++      default: Date.now,
++    }
++  },
++  { timestamps: true }
++);
++
++module.exports = mongoose.model("Subscription", subscriptionSchema);
+\ No newline at end of file
+diff --git a/backend/routes/notificationRoutes.js b/backend/routes/notificationRoutes.js
+index f1e8ede..9d4be73 100644
+--- a/backend/routes/notificationRoutes.js
++++ b/backend/routes/notificationRoutes.js
+@@ -6,6 +6,7 @@ const {
+   markAsRead,
+   markAllAsRead,
+   sendBillingReminders,
++  sendBroadcast,
+ } = require("../controllers/notificationController");
+ 
+ const protect = require("../middleware/authMiddleware");
+@@ -23,4 +24,7 @@ router.put("/", protect, authorizeRoles("admin"), markAllAsRead);
+ // Send billing reminders
+ router.post("/remind", protect, authorizeRoles("admin"), sendBillingReminders);
+ 
++// Admin sends custom broadcast alerts (WhatsApp + In-App)
++router.post("/broadcast", protect, authorizeRoles("admin"), sendBroadcast);
++
+ module.exports = router;
+\ No newline at end of file
+diff --git a/backend/routes/subscriptionRoutes.js b/backend/routes/subscriptionRoutes.js
+new file mode 100644
+index 0000000..6fb8349
+--- /dev/null
++++ b/backend/routes/subscriptionRoutes.js
+@@ -0,0 +1,22 @@
++const express = require("express");
++const router = express.Router();
++
++const {
++  getMySubscription,
++  updateMySubscription,
++  toggleVacationMode,
++  getAllSubscriptions,
++} = require("../controllers/subscriptionController");
++
++const protect = require("../middleware/authMiddleware");
++const authorizeRoles = require("../middleware/roleMiddleware");
++
++// 🔹 Customer Portal endpoints
++router.get("/my", protect, getMySubscription);
++router.put("/my", protect, updateMySubscription);
++router.post("/my/vacation", protect, toggleVacationMode);
++
++// 👑 Admin Portal endpoints
++router.get("/", protect, authorizeRoles("admin"), getAllSubscriptions);
++
++module.exports = router;
+\ No newline at end of file
+diff --git a/backend/server.js b/backend/server.js
+index 778de43..2c7f0e9 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -135,6 +135,7 @@ app.use("/api/pdf", require("./routes/pdfRoutes"));
+ app.use("/api/buffalo", protect, authorizeRoles("admin"), require("./routes/buffaloRoutes"));
+ app.use("/api/expenses", protect, authorizeRoles("admin"), require("./routes/expenseRoutes"));
+ app.use("/api/users", protect, authorizeRoles("admin"), require("./routes/userRoutes"));
++app.use("/api/subscriptions", require("./routes/subscriptionRoutes"));
+ 
+ // ─────────────────────────────────────────────
+ // MULTER (SECURED)
+@@ -247,4 +248,5 @@ connectDB().then(async () => {
+   }
+ });
+ // optional auto billing
+-require('./utils/autoBilling');
+\ No newline at end of file
++require('./utils/autoBilling');
++require('./utils/dailyDeliveries');
+\ No newline at end of file
+diff --git a/backend/utils/dailyDeliveries.js b/backend/utils/dailyDeliveries.js
+new file mode 100644
+index 0000000..2364dbf
+--- /dev/null
++++ b/backend/utils/dailyDeliveries.js
+@@ -0,0 +1,89 @@
++const cron = require('node-cron');
++const Subscription = require('../models/Subscription');
++const MilkEntry = require('../models/MilkEntry');
++const { Logger } = require('./logger');
++
++const logger = new Logger('scheduler-daily');
++
++// Price default for automated drops
++const DEFAULT_PRICE_PER_LITRE = 80;
++
++/**
++ * Automatically creates daily delivery entries from active customer subscriptions
++ */
++async function generateDailySubscriptionDeliveries() {
++  logger.info('☀️ Running daily subscription deliveries generation...');
++  try {
++    const today = new Date();
++    today.setHours(0, 0, 0, 0);
++
++    const activeSubscriptions = await Subscription.find({ isActive: true }).populate('userId');
++
++    logger.info(`Found ${activeSubscriptions.length} active subscriptions to check.`);
++
++    let count = 0;
++
++    for (const sub of activeSubscriptions) {
++      if (!sub.userId) {
++        continue;
++      }
++
++      // Check frequency rules:
++      let shouldDeliverToday = true;
++
++      if (sub.frequency === 'alternate') {
++        // Alternate days: deliver only on odd days of the month
++        const dateNum = new Date().getDate();
++        shouldDeliverToday = (dateNum % 2 !== 0); 
++      } else if (sub.frequency === 'weekly') {
++        // Weekly days: deliver only on Sundays
++        const weekday = new Date().getDay();
++        shouldDeliverToday = (weekday === 0); 
++      }
++
++      if (!shouldDeliverToday) {
++        logger.info(`Skipping alternating/weekly drop for @${sub.userId.username} today.`);
++        continue;
++      }
++
++      // Create MilkEntry record representing drop-off
++      const totalPrice = sub.quantity * DEFAULT_PRICE_PER_LITRE;
++      
++      // Prevent double generation for same customer + session + date
++      const exists = await MilkEntry.findOne({
++        userId: sub.userId._id,
++        date: today,
++        session: sub.timeSlot
++      });
++
++      if (exists) {
++        logger.info(`Delivery already logged for @${sub.userId.username} today.`);
++        continue;
++      }
++
++      await MilkEntry.create({
++        userId: sub.userId._id,
++        quantity: sub.quantity,
++        pricePerLitre: DEFAULT_PRICE_PER_LITRE,
++        totalPrice,
++        session: sub.timeSlot,
++        date: today,
++        entryType: "ORDER", // Auto-created subscriptions are order-based deliveries
++        notes: `Subscription Drop-off (${sub.frequency})`,
++      });
++
++      count++;
++    }
++
++    logger.success(`Successfully logged ${count} automated subscription drops for today!`);
++  } catch (err) {
++    logger.error('Subscription deliveries generator crashed', err);
++  }
++}
++
++// Schedule: Daily at 12:05 AM
++cron.schedule('0 5 0 * * *', async () => {
++  await generateDailySubscriptionDeliveries();
++});
++
++module.exports = { generateDailySubscriptionDeliveries };
+\ No newline at end of file
+diff --git a/backend/utils/pdfGenerator.js b/backend/utils/pdfGenerator.js
+index 68e2cea..8d869e8 100644
+--- a/backend/utils/pdfGenerator.js
++++ b/backend/utils/pdfGenerator.js
+@@ -123,10 +123,11 @@ function generateInvoicePDF(filePath, data) {
+       // Table header
+       const tableTop = yPos;
+       const colDate = leftMargin;
+-      const colSession = leftMargin + 90;
+-      const colQty = leftMargin + 200;
+-      const colPrice = leftMargin + 260;
+-      const colTotal = leftMargin + 350;
++      const colSession = leftMargin + 80;
++      const colQty = leftMargin + 170;
++      const colPrice = leftMargin + 240;
++      const colTotal = leftMargin + 320;
++      const colType = leftMargin + 410;
+ 
+       doc.fontSize(smallFontSize).font('Helvetica-Bold').fillColor('#000');
+       doc.text('Date', colDate, tableTop);
+@@ -134,6 +135,7 @@ function generateInvoicePDF(filePath, data) {
+       doc.text('Quantity (L)', colQty, tableTop);
+       doc.text('Price/L (₹)', colPrice, tableTop);
+       doc.text('Amount (₹)', colTotal, tableTop);
++      doc.text('Type', colType, tableTop);
+ 
+       // Horizontal line under header
+       doc.moveTo(leftMargin, tableTop + 15).lineTo(rightMargin, tableTop + 15)
+@@ -149,12 +151,14 @@ function generateInvoicePDF(filePath, data) {
+         const quantity = formatNumber(entry.quantity || 0);
+         const price = formatNumber(entry.pricePerLitre || 0);
+         const total = formatNumber(entry.totalPrice || 0);
++        const typeText = entry.entryType === 'ORDER' ? 'Ordered' : 'Normal';
+ 
+         doc.text(date, colDate, yPos);
+         doc.text(session, colSession, yPos);
+         doc.text(quantity, colQty, yPos, { align: 'right' });
+         doc.text(price, colPrice, yPos, { align: 'right' });
+         doc.text(total, colTotal, yPos, { align: 'right' });
++        doc.text(typeText, colType, yPos);
+ 
+         yPos += 16;
+ 
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index ff571bb..2c0e930 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -30,6 +30,10 @@
+         "three": "^0.183.2",
+         "three-stdlib": "^2.36.1",
+         "web-vitals": "^2.1.4"
++      },
++      "devDependencies": {
++        "autoprefixer": "^10.4.27",
++        "tailwindcss": "^3.4.19"
+       }
+     },
+     "node_modules/@adobe/css-tools": {
+@@ -16439,6 +16443,23 @@
+         }
+       }
+     },
++    "node_modules/tailwindcss/node_modules/yaml": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz",
++      "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
++      "license": "ISC",
++      "optional": true,
++      "peer": true,
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    },
+     "node_modules/tapable": {
+       "version": "2.3.2",
+       "resolved": "https://registry.npmjs.org/tapable/-/tapable-2.3.2.tgz",
+diff --git a/frontend/src/App.js b/frontend/src/App.js
+index d26ad8d..af413d4 100644
+--- a/frontend/src/App.js
++++ b/frontend/src/App.js
+@@ -1,41 +1,46 @@
+-import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+-// import CustomerDashboard from './pages/customer/CustomerDashboard';
++import React, { useState, useEffect, useRef, useSyncExternalStore, Suspense } from 'react';
+ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+ import { useIsFetching } from '@tanstack/react-query';
+ import { useAuth } from './context/AuthContext';
+ import { subscribeApiLoading, getApiPendingCount } from './services/api';
+ import TopProgressBar from './components/TopProgressBar';
+-import LandingPage from './pages/auth/LandingPage';
+-import Login from './pages/auth/Login';
+-import Register from './pages/auth/Register';
+-import AdminLayout from './components/AdminLayout';
+-import CustomerLayout from './components/CustomerLayout';
+-import AdminDashboard from './pages/admin/Dashboard';
+-import MilkEntry from './pages/admin/MilkEntry';
+-import AdminOrders from './pages/admin/Orders';
+-import AdminPayments from './pages/admin/Payments';
+-import Customers from './pages/admin/Customers';
+-import CustomerDetails from './pages/admin/CustomerDetails';
+-import Expenses from './pages/admin/Expenses';
+-import BuffaloList from './pages/admin/BuffaloList';
+-import AddBuffalo from './pages/admin/Buffalo';
+-import BuffaloDetails from './pages/admin/BuffaloDetails';
+-import CustomerDashboard from './pages/customer/Dashboard';
+-import MilkView from './pages/customer/MilkView';
+-import CustomerOrders from './pages/customer/Orders';
+-import CustomerPayments from './pages/customer/Payments';
+-import ChartPage from './pages/customer/Chart';
+ import PremiumLoading from './components/PremiumLoading';
++import GlobalTranslator from './components/GlobalTranslator';
++
++// ─────────────────────────────────────────────
++// LAZY-LOADED COMPONENTS (Code-Splitting for Minimal Initial Bundle Size)
++// ─────────────────────────────────────────────
++const LandingPage = React.lazy(() => import('./pages/auth/LandingPage'));
++const Login = React.lazy(() => import('./pages/auth/Login'));
++const Register = React.lazy(() => import('./pages/auth/Register'));
++const AdminLayout = React.lazy(() => import('./components/AdminLayout'));
++const CustomerLayout = React.lazy(() => import('./components/CustomerLayout'));
++const AdminDashboard = React.lazy(() => import('./pages/admin/Dashboard'));
++const MilkEntry = React.lazy(() => import('./pages/admin/MilkEntry'));
++const AdminOrders = React.lazy(() => import('./pages/admin/Orders'));
++const AdminPayments = React.lazy(() => import('./pages/admin/Payments'));
++const Customers = React.lazy(() => import('./pages/admin/Customers'));
++const CustomerDetails = React.lazy(() => import('./pages/admin/CustomerDetails'));
++const Expenses = React.lazy(() => import('./pages/admin/Expenses'));
++const BuffaloList = React.lazy(() => import('./pages/admin/BuffaloList'));
++const AddBuffalo = React.lazy(() => import('./pages/admin/Buffalo'));
++const BuffaloDetails = React.lazy(() => import('./pages/admin/BuffaloDetails'));
++const Broadcast = React.lazy(() => import('./pages/admin/Broadcast'));
++const CustomerDashboard = React.lazy(() => import('./pages/customer/Dashboard'));
++const MilkView = React.lazy(() => import('./pages/customer/MilkView'));
++const CustomerOrders = React.lazy(() => import('./pages/customer/Orders'));
++const CustomerPayments = React.lazy(() => import('./pages/customer/Payments'));
++const ChartPage = React.lazy(() => import('./pages/customer/Chart'));
+ 
+ const ProtectedRoute = ({ children, allowedRole }) => {
+   const { user, loading } = useAuth();
+   
+   if (loading) return null;
+   
+-  if (!user) return <Navigate to="/login" />;
++  if (!user) return <Navigate to="/login" replace />;
+   
+   if (allowedRole && user.role !== allowedRole) {
+-    return user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/customer" />;
++    return user.role === 'admin' ? <Navigate to="/admin" replace /> : <Navigate to="/customer/dashboard" replace />;
+   }
+   
+   return children;
+@@ -69,45 +74,49 @@ const App = () => {
+ 
+   return (
+     <>
+-      <Routes>
+-      <Route path="/" element={<LandingPage />} />
+-      <Route path="/login" element={<Login />} />
+-      <Route path="/register" element={<Register />} />
+-      
+-      <Route path="/admin" element={
+-        <ProtectedRoute allowedRole="admin">
+-          <AdminLayout />
+-        </ProtectedRoute>
+-      }>
+-        <Route index element={<AdminDashboard />} />
+-        <Route path="milk" element={<MilkEntry />} />
+-        <Route path="buffalo">
+-          <Route index element={<BuffaloList />} />
+-          <Route path="add" element={<AddBuffalo />} />
+-          <Route path=":id" element={<BuffaloDetails />} />
+-        </Route>
+-        <Route path="orders" element={<AdminOrders />} />
+-        <Route path="payments" element={<AdminPayments />} />
+-        <Route path="customers" element={<Customers />} />
+-        <Route path="customers/:id" element={<CustomerDetails />} />
+-        <Route path="expenses" element={<Expenses />} />
+-      </Route>
+-      
+-      <Route path="/customer" element={
+-        <ProtectedRoute allowedRole="customer">
+-          <CustomerLayout />
+-        </ProtectedRoute>
+-      }>
+-        {/* <Route index element={<CustomerDashboard />} /> */}
+-        <Route path="/customer/dashboard" element={<CustomerDashboard />} />
+-        <Route path="milk" element={<MilkView />} />
+-        <Route path="orders" element={<CustomerOrders />} />
+-        <Route path="payments" element={<CustomerPayments />} />
+-        <Route path="chart" element={<ChartPage />} />
+-      </Route>
++      <GlobalTranslator />
++      <Suspense fallback={<PremiumLoading />}>
++        <Routes>
++          <Route path="/" element={<LandingPage />} />
++          <Route path="/login" element={<Login />} />
++          <Route path="/register" element={<Register />} />
++          
++          <Route path="/admin" element={
++            <ProtectedRoute allowedRole="admin">
++              <AdminLayout />
++            </ProtectedRoute>
++          }>
++            <Route index element={<AdminDashboard />} />
++            <Route path="milk" element={<MilkEntry />} />
++            <Route path="buffalo">
++              <Route index element={<BuffaloList />} />
++              <Route path="add" element={<AddBuffalo />} />
++              <Route path=":id" element={<BuffaloDetails />} />
++            </Route>
++            <Route path="orders" element={<AdminOrders />} />
++            <Route path="payments" element={<AdminPayments />} />
++            <Route path="customers" element={<Customers />} />
++            <Route path="customers/:id" element={<CustomerDetails />} />
++            <Route path="expenses" element={<Expenses />} />
++            <Route path="broadcast" element={<Broadcast />} />
++          </Route>
++          
++          <Route path="/customer" element={
++            <ProtectedRoute allowedRole="customer">
++              <CustomerLayout />
++            </ProtectedRoute>
++          }>
++            <Route index element={<Navigate to="/customer/dashboard" replace />} />
++            <Route path="dashboard" element={<CustomerDashboard />} />
++            <Route path="milk" element={<MilkView />} />
++            <Route path="orders" element={<CustomerOrders />} />
++            <Route path="payments" element={<CustomerPayments />} />
++            <Route path="chart" element={<ChartPage />} />
++          </Route>
+ 
+-      <Route path="*" element={<Navigate to="/" />} />
+-      </Routes>
++          <Route path="*" element={<Navigate to="/" replace />} />
++        </Routes>
++      </Suspense>
+       {authLoading && <PremiumLoading />}
+       <TopProgressBar active={topLoaderActive} />
+     </>
+diff --git a/frontend/src/assets/images/logo/favicon.png b/frontend/src/assets/images/logo/favicon.png
+index 74e0e75..f01b239 100644
+Binary files a/frontend/src/assets/images/logo/favicon.png and b/frontend/src/assets/images/logo/favicon.png differ
+diff --git a/frontend/src/assets/images/logo/icon.png b/frontend/src/assets/images/logo/icon.png
+index 2a0f85e..defa1c2 100644
+Binary files a/frontend/src/assets/images/logo/icon.png and b/frontend/src/assets/images/logo/icon.png differ
+diff --git a/frontend/src/assets/images/logo/logo.png b/frontend/src/assets/images/logo/logo.png
+index 502cd52..a0de2df 100644
+Binary files a/frontend/src/assets/images/logo/logo.png and b/frontend/src/assets/images/logo/logo.png differ
+diff --git a/frontend/src/assets/images/logo_backup/favicon.png b/frontend/src/assets/images/logo_backup/favicon.png
+new file mode 100644
+index 0000000..74e0e75
+Binary files /dev/null and b/frontend/src/assets/images/logo_backup/favicon.png differ
+diff --git a/frontend/src/assets/images/logo_backup/icon.png b/frontend/src/assets/images/logo_backup/icon.png
+new file mode 100644
+index 0000000..2a0f85e
+Binary files /dev/null and b/frontend/src/assets/images/logo_backup/icon.png differ
+diff --git a/frontend/src/assets/images/logo_backup/logo.png b/frontend/src/assets/images/logo_backup/logo.png
+new file mode 100644
+index 0000000..502cd52
+Binary files /dev/null and b/frontend/src/assets/images/logo_backup/logo.png differ
+diff --git a/frontend/src/components/BillingTable.jsx b/frontend/src/components/BillingTable.jsx
+index 5d6c13c..c557539 100644
+--- a/frontend/src/components/BillingTable.jsx
++++ b/frontend/src/components/BillingTable.jsx
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import DataTable from './DataTable';
++import EntryTypeBadge from './EntryTypeBadge';
+ 
+ const BillingTable = ({ entries = [], totalLitres = 0, totalPrice = 0, month = '' }) => {
+   const safeEntries = Array.isArray(entries) ? entries : [];
+@@ -55,6 +56,11 @@ const BillingTable = ({ entries = [], totalLitres = 0, totalPrice = 0, month = '
+       className: 'price',
+       render: (val) => formatPrice(val),
+     },
++    {
++      label: 'Type',
++      key: 'entryType',
++      render: (val) => <EntryTypeBadge type={val || 'NORMAL'} />,
++    },
+   ];
+ 
+   const footer = (
+@@ -65,6 +71,7 @@ const BillingTable = ({ entries = [], totalLitres = 0, totalPrice = 0, month = '
+         <td style={{ fontWeight: 600, color: '#2d5f3f' }}>
+           {formatPrice(totalPrice)}
+         </td>
++        <td></td>
+       </tr>
+     </tfoot>
+   );
+diff --git a/frontend/src/components/EntryTypeBadge.jsx b/frontend/src/components/EntryTypeBadge.jsx
+new file mode 100644
+index 0000000..e86306f
+--- /dev/null
++++ b/frontend/src/components/EntryTypeBadge.jsx
+@@ -0,0 +1,31 @@
++import React from 'react';
++
++const EntryTypeBadge = ({ type }) => {
++  const isOrder = String(type).toUpperCase() === 'ORDER';
++
++  const badgeStyle = {
++    display: 'inline-flex',
++    alignItems: 'center',
++    gap: '6px',
++    padding: '4px 10px',
++    borderRadius: '12px',
++    fontSize: '0.8rem',
++    fontWeight: 600,
++    textTransform: 'uppercase',
++    letterSpacing: '0.3px',
++    background: isOrder ? '#dbeafe' : '#dcfce7',
++    color: isOrder ? '#2563eb' : '#16a34a',
++    border: `1px solid ${isOrder ? 'rgba(37, 99, 235, 0.15)' : 'rgba(22, 163, 74, 0.15)'}`,
++    width: 'fit-content',
++    whiteSpace: 'nowrap'
++  };
++
++  return (
++    <span style={badgeStyle}>
++      <span>{isOrder ? '📦' : '🥛'}</span>
++      <span>{isOrder ? 'Ordered' : 'Normal'}</span>
++    </span>
++  );
++};
++
++export default EntryTypeBadge;
+\ No newline at end of file
+diff --git a/frontend/src/components/GlobalTranslator.jsx b/frontend/src/components/GlobalTranslator.jsx
+new file mode 100644
+index 0000000..9148e78
+--- /dev/null
++++ b/frontend/src/components/GlobalTranslator.jsx
+@@ -0,0 +1,197 @@
++import { useEffect } from 'react';
++import { useLanguage } from '../context/LanguageContext';
++
++// Standard dictionary matching English terms to Hindi and Telugu translations.
++// Keeps lookup keys in lowercase to ensure flexible matching regardless of CSS text-transforms.
++const lookupDictionary = {
++  // Navigation / Headers
++  'dashboard': { te: 'డాష్‌బోర్డ్', hi: 'डैशबोर्ड' },
++  'milk entry': { te: 'పాల నమోదు', hi: 'दूध प्रविष्टि' },
++  'buffalo': { te: 'గేదెల నిర్వహణ', hi: 'భैंस प्रबंधन' },
++  'expenses': { te: 'ఖర్చులు', hi: 'खर्च' },
++  'orders': { te: 'ఆర్డర్లు', hi: 'आर्डर सूची' },
++  'payments': { te: 'చెల్లింపులు', hi: 'भुगतान' },
++  'customers': { te: 'వినియోగదారులు', hi: 'ग्राहक' },
++  'broadcaster': { te: 'సమాచార ప్రసారం', hi: 'प्रसारक' },
++  'analytics': { te: 'విశ్లేషణలు', hi: 'विश्लेषण' },
++  'logout': { te: 'లాగ్అవుట్', hi: 'लॉगआउट' },
++
++  // Payments and Billing page
++  'payments & billing': { te: 'చెల్లింపులు & బిల్లింగ్', hi: 'भुगतान और बिलिंग' },
++  'generate monthly bills from milk records, then record collections': { 
++    te: 'పాల రికార్డుల నుండి నెలవారీ బిల్లులను సృష్టించండి, ఆపై వసూళ్లను నమోదు చేయండి', 
++    hi: 'दूध के रिकॉर्ड से मासिक बिल बनाएं, फिर संग्रह दर्ज करें' 
++  },
++  'total collected': { te: 'మొత్తం వసూలు చేసినది', hi: 'कुल एकत्रित' },
++  'outstanding': { te: 'చెల్లించవలసిన బాకీ', hi: 'बकाया' },
++  'bills': { te: 'బిల్లులు', hi: 'बिल' },
++  'generate bill': { te: 'బిల్లును సృష్టించండి', hi: 'बिल बनाएं' },
++  'bills use recorded milk for the selected period.': { 
++    te: 'ఎంచుకున్న కాలానికి నమోదు చేసిన పాలు ఆధారంగా బిల్లులు లెక్కించబడతాయి.', 
++    hi: 'विधेयक चयनित अवधि के लिए दर्ज दूध का उपयोग करते हैं।' 
++  },
++  'customer': { te: 'వినియోగదారుడు', hi: 'ग्राहक' },
++  'select customer...': { te: 'వినియోగదారుడిని ఎంచుకోండి...', hi: 'ग्राहक चुनें...' },
++  'month': { te: 'నెల', hi: 'महीना' },
++  'year': { te: 'సంవత్సరం', hi: 'वर्ष' },
++  'june': { te: 'జూన్', hi: 'जून' },
++  'july': { te: 'జూలై', hi: 'जुलाई' },
++  'download invoice': { te: 'ఇన్వాయిస్ డౌన్‌లోడ్ చేయి', hi: 'इनवॉइस डाउनलोड करें' },
++
++  // Broadcaster page
++  'compose new alert': { te: 'కొత్త హెచ్చరికను రాయండి', hi: 'नया संदेश लिखें' },
++  'target audience': { te: 'లక్ష్య వినియోగదారులు', hi: 'सक्रिय ग्राहक' },
++  'all active customers': { te: 'యాక్టివ్ వినియోగదారులందరూ', hi: 'सभी सक्रिय ग्राहक' },
++  'message templates': { te: 'సందేశ టెంప్లేట్లు', hi: 'संदेश टेम्प्लेट' },
++  'rain delay': { te: 'వర్షం ఆలస్యం', hi: 'बारिश के कारण देरी' },
++  'fresh ghee stock': { te: 'తాజా నెయ్యి స్టాక్', hi: 'ताजा घी स्टॉक' },
++  'payment due alert': { te: 'చెల్లింపు బాకీ హెచ్చరిక', hi: 'भुगतान देय अलर्ट' },
++  'festive holiday pause': { te: 'పండుగ సెలవు నిలిపివేత', hi: 'त्योहार की छुट्टी रोक' },
++  'alert message (whatsapp & in-app)': { te: 'హెచ్చరిక సందేశం (వాట్సాప్ & ఇన్-యాప్)', hi: 'चेतावनी संदेश (व्हाट्सएप और इन-ऐप)' },
++  'type your message here...': { te: 'మీ సందేశాన్ని ఇక్కడ టైప్ చేయండి...', hi: 'अपना संदेश यहाँ लिखें...' },
++  'keep text clear and brief.': { te: 'సందేశాన్ని స్పష్టంగా మరియు క్లుప్తంగా ఉంచండి.', hi: 'पाठ को स्पष्ट और संक्षिप्त रखें।' },
++  'dispatch broadcast alert': { te: 'బ్రాడ్‌కాస్ట్ హెచ్చరికను పంపండి', hi: 'प्रसारण चेतावनी भेजें' },
++  'multi-channel dispatch': { te: 'మల్టీ-ఛానల్ డిస్పాచ్', hi: 'మల్టీ-ఛానల్ డిస్పాచ్' },
++  'last broadcast dispatch log': { te: 'చివరి సమాచార ప్రసారాల లాగ్', hi: 'अंतिम प्रसारण लॉग' },
++
++  // Orders page
++  'order management': { te: 'ఆర్డర్ నిర్వహణ', hi: 'आर्डर प्रबंधन' },
++  'manage and track customer orders': { te: 'వినియోగదారుల ఆర్డర్లను నిర్వహించండి & ట్రాక్ చేయండి', hi: 'ग्राहक आर्डर प्रबंधित और ट्रैक करें' },
++  'all orders': { te: 'అన్ని ఆర్డర్లు', hi: 'सभी आर्डर' },
++  'create new order': { te: 'కొత్త ఆర్డర్ సృష్టించు', hi: 'नया आर्डर बनाएं' },
++  'order id': { te: 'ఆర్డర్ ఐడి', hi: 'आर्डर आईडी' },
++  'quantity': { te: 'పరిమాణం', hi: 'मात्रा' },
++  'time slot': { te: 'సమయ స్లాట్', hi: 'समय' },
++  'time': { te: 'సమయం', hi: 'समय' },
++  'actions': { te: 'చర్యలు', hi: 'कार्रवाई' },
++  'date': { te: 'తేదీ', hi: 'तारीख' },
++  'morning': { te: 'ఉదయం', hi: 'सुबह' },
++  'evening': { te: 'సాయంత్రం', hi: 'शाम' },
++  'rate': { te: 'ధర', hi: 'दर' },
++  'total litres': { te: 'మొత్తం లీటర్లు', hi: 'कुल लीटर' },
++  'total amount': { te: 'మొత్తం ధర', hi: 'कुल राशि' },
++
++  // Milk Entry page
++  'milk volume trends from your records': { te: 'మీ రికార్డుల నుండి పాల పరిమాణాల ట్రెండ్స్', hi: 'आपके रिकॉर्ड से दूध की मात्रा का रुझान' },
++  'manage daily milk collection': { te: 'రోజువారీ పాల సేకరణను నిర్వహించండి', hi: 'दैनिक दूध संग्रह प्रबंधित करें' },
++  'recent entries': { te: 'ఇటీవలి నమోదులు', hi: 'हाल की प्रविष्टियां' },
++  'total entries': { te: 'మొత్తం నమోదులు', hi: 'कुल प्रविष्टियां' },
++  'avg per entry': { te: 'సగటు నమోదు', hi: 'औसत प्रति प्रविष्टि' },
++  'add milk entry': { te: 'పాల నమోదును జోడించు', hi: 'दूध प्रविष्टि जोड़ें' },
++
++  // Buffalo page
++  'buffalo herd overview': { te: 'గేదెల మంద వివరాలు', hi: 'भैंस झुंड अवलोकन' },
++  'search & filter by status': { te: 'స్థితి ఆధారంగా శోధించండి & వడపోయండి', hi: 'खोजें और स्थिति फ़िल्टर करें' },
++  'add buffalo': { te: 'గేదెను జోడించు', hi: 'भैंस जोड़ें' },
++  'active': { te: 'యాక్టివ్', hi: 'सक्रिय' },
++  'pregnant': { te: 'గర్భవతి', hi: 'गर्भवती' },
++  'ready': { te: 'సిద్ధంగా ఉంది', hi: 'तैयार' },
++  'dried': { te: 'ఎండినది', hi: 'सूखा' },
++  'breed': { te: 'జాతి', hi: 'नस्ल' },
++  'age': { te: 'వయస్సు', hi: 'उम्र' },
++  'milk capacity': { te: 'పాల సామర్థ్యం', hi: 'दूध क्षमता' },
++  'tag id': { te: 'ట్యాగ్ ఐడి', hi: 'ట్యాగ్ ఐడి' },
++
++  // Expenses page
++  'manage farm expenses': { te: 'ఫామ్ ఖర్చులను నిర్వహించండి', hi: 'खर्च प्रबंधित करें' },
++  'category': { te: 'వర్గం', hi: 'श्रेणी' },
++  'description': { te: 'వివరణ', hi: 'विवरण' },
++  'add expense': { te: 'ఖర్చును జోడించు', hi: 'खर्च जोड़ें' },
++  'total expenses': { te: 'మొత్తం ఖర్చులు', hi: 'कुल खर्च' },
++  'recent expenses': { te: 'ఇటీవలి ఖర్చులు', hi: 'हाल के खर्च' },
++
++  // Customers Page
++  'manage customer profiles and balances': { te: 'వినియోగదారుల ప్రొఫైల్స్ మరియు బ్యాలెన్స్ నిర్వహించండి', hi: 'ग्राहक प्रोफाइल प्रबंधित करें' },
++  'add customer': { te: 'వినియోగదారుడిని జోడించు', hi: 'ग्राहक जोड़ें' },
++  'phone number': { te: 'ఫోన్ నంబర్', hi: 'फ़ोन नंबर' },
++  'balance': { te: 'బ్యాలెన్స్', hi: 'शेष राशि' },
++  'joined': { te: 'చేరిన తేదీ', hi: 'शामिल हुए' },
++
++  // Dashboard Overview
++  'welcome back': { te: 'మళ్ళీ స్వాగతం!', hi: 'वापसी पर स्वागत है!' },
++  'total customers': { te: 'మొత్తం వినియోగదారులు', hi: 'कुल ग्राहक' },
++  'total revenue': { te: 'మొత్తం రాబడి', hi: 'कुल राजस्व' },
++  'pending orders': { te: 'పెండింగ్ ఆర్డర్లు', hi: 'लंबित आर्डर' },
++  'recent orders': { te: 'ఇటీవలి ఆర్డర్లు', hi: 'हाल के आर्डर' }
++};
++
++// Translates recursively starting from any DOM node
++const runDomTranslation = (node, lang) => {
++  if (node.nodeType === Node.TEXT_NODE) {
++    const text = node.nodeValue.trim();
++    if (!text) return;
++
++    // Cache the original English text to restore later on-demand
++    if (node._originalText === undefined) {
++      node._originalText = node.nodeValue;
++    }
++
++    if (lang === 'en') {
++      if (node.nodeValue !== node._originalText) {
++        node.nodeValue = node._originalText;
++      }
++      return;
++    }
++
++    // Lookup translated equivalent
++    const cleanKey = text.toLowerCase().replace(/[:?]/g, '').trim();
++    if (lookupDictionary[cleanKey] && lookupDictionary[cleanKey][lang]) {
++      const suffix = node._originalText.endsWith(':') ? ':' : node._originalText.endsWith('?') ? '?' : '';
++      node.nodeValue = lookupDictionary[cleanKey][lang] + suffix;
++    }
++  } else {
++    // Avoid translating raw scripts, stylesheet styles, or input texts
++    if (node.nodeName === 'SCRIPT' || node.nodeName === 'STYLE' || node.nodeName === 'INPUT' || node.nodeName === 'TEXTAREA') {
++      return;
++    }
++
++    // Dynamically translate placeholders on input elements
++    if (node.placeholder && typeof node.placeholder === 'string') {
++      if (node._originalPlaceholder === undefined) {
++        node._originalPlaceholder = node.placeholder;
++      }
++      if (lang === 'en') {
++        node.placeholder = node._originalPlaceholder;
++      } else {
++        const cleanPlaceholder = node._originalPlaceholder.toLowerCase().replace(/[:?.]/g, '').trim();
++        if (lookupDictionary[cleanPlaceholder] && lookupDictionary[cleanPlaceholder][lang]) {
++          node.placeholder = lookupDictionary[cleanPlaceholder][lang];
++        }
++      }
++    }
++
++    // Traverse all child nodes recursively
++    for (let child of node.childNodes) {
++      runDomTranslation(child, lang);
++    }
++  }
++};
++
++const GlobalTranslator = () => {
++  const { language } = useLanguage();
++
++  useEffect(() => {
++    // Immediate translation on render
++    runDomTranslation(document.body, language);
++
++    // MutationObserver monitors the DOM tree and translates newly loaded API data or elements on-the-fly
++    const observer = new MutationObserver((mutations) => {
++      mutations.forEach((mutation) => {
++        mutation.addedNodes.forEach((node) => {
++          runDomTranslation(node, language);
++        });
++      });
++    });
++
++    observer.observe(document.body, {
++      childList: true,
++      subtree: true
++    });
++
++    return () => observer.disconnect();
++  }, [language]);
++
++  return null; // Silent background helper component
++};
++
++export default GlobalTranslator;
+\ No newline at end of file
+diff --git a/frontend/src/components/LanguageSelector.jsx b/frontend/src/components/LanguageSelector.jsx
+new file mode 100644
+index 0000000..30b8690
+--- /dev/null
++++ b/frontend/src/components/LanguageSelector.jsx
+@@ -0,0 +1,38 @@
++import React from 'react';
++import { useLanguage } from '../context/LanguageContext';
++import { FiGlobe } from 'react-icons/fi';
++
++const LanguageSelector = () => {
++  const { language, changeLanguage } = useLanguage();
++
++  const handleLanguageChange = (e) => {
++    changeLanguage(e.target.value);
++  };
++
++  return (
++    <div className="language-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '10px', background: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.15)' }}>
++      <FiGlobe size={18} style={{ color: 'var(--ds-text-muted)', flexShrink: 0 }} />
++      <select
++        value={language}
++        onChange={handleLanguageChange}
++        style={{
++          background: 'transparent',
++          border: 'none',
++          color: 'var(--ds-text)',
++          fontSize: '0.88rem',
++          fontWeight: 600,
++          cursor: 'pointer',
++          outline: 'none',
++          width: '100%',
++          fontFamily: "'Inter', sans-serif"
++        }}
++      >
++        <option value="en" style={{ background: 'var(--ds-surface-strong)', color: 'var(--ds-text)' }}>🇺🇸 English</option>
++        <option value="hi" style={{ background: 'var(--ds-surface-strong)', color: 'var(--ds-text)' }}>🇮🇳 हिंदी (Hindi)</option>
++        <option value="te" style={{ background: 'var(--ds-surface-strong)', color: 'var(--ds-text)' }}>🇮🇳 తెలుగు (Telugu)</option>
++      </select>
++    </div>
++  );
++};
++
++export default LanguageSelector;
+\ No newline at end of file
+diff --git a/frontend/src/components/Sidebar.jsx b/frontend/src/components/Sidebar.jsx
+index e99f6ca..860550f 100644
+--- a/frontend/src/components/Sidebar.jsx
++++ b/frontend/src/components/Sidebar.jsx
+@@ -2,7 +2,9 @@ import React, { useState } from 'react';
+ import { motion } from 'framer-motion';
+ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+ import { useAuth } from '../context/AuthContext';
++import { useLanguage } from '../context/LanguageContext';
+ import ThemeToggle from './ThemeToggle';
++import LanguageSelector from './LanguageSelector';
+ import icon from '../assets/images/logo/icon.png';
+ import {
+   FiHome,
+@@ -12,25 +14,27 @@ import {
+   FiDroplet,
+   FiDollarSign,
+   FiActivity,
+-  FiLogOut
++  FiLogOut,
++  FiMessageSquare
+ } from 'react-icons/fi';
+ 
+ export const menuConfig = {
+   admin: [
+-    { path: '/admin', icon: FiHome, label: 'Dashboard', exact: true },
+-    { path: '/admin/milk', icon: FiDroplet, label: 'Milk Entry' },
+-    { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo' },
+-    { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses' },
+-    { path: '/admin/orders', icon: FiBox, label: 'Orders' },
+-    { path: '/admin/payments', icon: FiCreditCard, label: 'Payments' },
+-    { path: '/admin/customers', icon: FiUsers, label: 'Customers' },
++    { path: '/admin', icon: FiHome, label: 'Dashboard', labelKey: 'dashboard', exact: true },
++    { path: '/admin/milk', icon: FiDroplet, label: 'Milk Entry', labelKey: 'milkEntry' },
++    { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo', labelKey: 'buffalo' },
++    { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses', labelKey: 'expenses' },
++    { path: '/admin/orders', icon: FiBox, label: 'Orders', labelKey: 'orders' },
++    { path: '/admin/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
++    { path: '/admin/customers', icon: FiUsers, label: 'Customers', labelKey: 'customers' },
++    { path: '/admin/broadcast', icon: FiMessageSquare, label: 'Broadcaster', labelKey: 'broadcaster' },
+   ],
+   customer: [
+-    { path: '/customer/dashboard', icon: FiHome, label: 'My Dashboard' },
+-    { path: '/customer/milk', icon: FiDroplet, label: 'My Milk Records' },
+-    { path: '/customer/orders', icon: FiBox, label: 'Orders' },
+-    { path: '/customer/payments', icon: FiCreditCard, label: 'Payments' },
+-    { path: '/customer/chart', icon: FiBox, label: 'Analytics' },
++    { path: '/customer/dashboard', icon: FiHome, label: 'My Dashboard', labelKey: 'dashboard' },
++    { path: '/customer/milk', icon: FiDroplet, label: 'My Milk Records', labelKey: 'milkEntry' },
++    { path: '/customer/orders', icon: FiBox, label: 'Orders', labelKey: 'orders' },
++    { path: '/customer/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
++    { path: '/customer/chart', icon: FiBox, label: 'Analytics', labelKey: 'analytics' },
+   ],
+ };
+ 
+@@ -55,7 +59,8 @@ const menuTheme = {
+ 
+ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, collapsed }) => {
+   const Icon = item.icon || FiHome;
+-  const t = menuTheme[theme] || menuTheme.light;
++  const themeConfig = menuTheme[theme] || menuTheme.light;
++  const { t: translate } = useLanguage();
+ 
+   return (
+     <NavLink
+@@ -70,12 +75,12 @@ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave,
+         padding: collapsed ? '0' : '0 16px',
+         justifyContent: collapsed ? 'center' : 'flex-start',
+         borderRadius: '10px',
+-        color: linkActive ? t.activeColor : t.textMuted,
+-        background: linkActive ? t.activeBg : hovered ? t.hoverBg : 'transparent',
++        color: linkActive ? themeConfig.activeColor : themeConfig.textMuted,
++        background: linkActive ? themeConfig.activeBg : hovered ? themeConfig.hoverBg : 'transparent',
+         textDecoration: 'none',
+         fontWeight: linkActive ? 600 : 500,
+-        border: `1px solid ${linkActive ? t.activeBorder : 'transparent'}`,
+-        borderLeft: `3px solid ${linkActive ? t.accent : 'transparent'}`,
++        border: `1px solid ${linkActive ? themeConfig.activeBorder : 'transparent'}`,
++        borderLeft: `3px solid ${linkActive ? themeConfig.accent : 'transparent'}`,
+         fontFamily: "'Inter', sans-serif",
+         fontSize: '0.95rem',
+         transition: 'background 0.2s ease, color 0.2s ease',
+@@ -94,7 +99,7 @@ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave,
+       >
+         <Icon size={collapsed ? 22 : 20} />
+       </motion.span>
+-      {!collapsed && <span className="menu-text">{item.label}</span>}
++      {!collapsed && <span className="menu-text">{translate(item.labelKey)}</span>}
+     </NavLink>
+   );
+ };
+@@ -103,6 +108,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile
+   const { user, logout } = useAuth();
+   const navigate = useNavigate();
+   const location = useLocation();
++  const { t: translate } = useLanguage();
+   const [hoveredItem, setHoveredItem] = useState(null);
+ 
+   const menuItems = menuConfig[role] || menuConfig.admin;
+@@ -179,10 +185,11 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile
+         })}
+       </nav>
+ 
+-      {/* Theme toggle (persistent, both portals) */}
++      {/* Theme & Language selector (persistent, both portals) */}
+       {!collapsed && (
+-        <div className="sidebar__theme">
++        <div className="sidebar__theme" style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px' }}>
+           <ThemeToggle />
++          <LanguageSelector />
+         </div>
+       )}
+ 
+@@ -224,7 +231,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile
+               aria-label="Logout"
+             >
+               <FiLogOut size={18} />
+-              <span className="user-text">Logout</span>
++              <span className="user-text">{translate('logout')}</span>
+             </motion.button>
+           </>
+         )}
+@@ -233,4 +240,4 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile
+   );
+ };
+ 
+-export default Sidebar;
++export default Sidebar;
+\ No newline at end of file
+diff --git a/frontend/src/components/admin/MilkEntryTable.jsx b/frontend/src/components/admin/MilkEntryTable.jsx
+index bdcb51f..36847f1 100644
+--- a/frontend/src/components/admin/MilkEntryTable.jsx
++++ b/frontend/src/components/admin/MilkEntryTable.jsx
+@@ -1,5 +1,6 @@
+ import React, { useState } from 'react';
+ import DataTable from '../DataTable';
++import EntryTypeBadge from '../EntryTypeBadge';
+ 
+ // ✅ Quantity labels
+ const quantityLabels = {
+@@ -64,6 +65,11 @@ export const MilkEntryTable = ({ entries = [], handleDelete }) => {
+       key: 'session',
+       render: (val) => <span className="session-badge">{val}</span>,
+     },
++    {
++      label: 'Type',
++      key: 'entryType',
++      render: (val) => <EntryTypeBadge type={val || 'NORMAL'} />,
++    },
+     {
+       label: '',
+       key: '_id',
+diff --git a/frontend/src/context/LanguageContext.jsx b/frontend/src/context/LanguageContext.jsx
+index d1f85e8..0b4ff0d 100644
+--- a/frontend/src/context/LanguageContext.jsx
++++ b/frontend/src/context/LanguageContext.jsx
+@@ -5,10 +5,12 @@ const translations = {
+     // Navigation
+     dashboard: 'Dashboard',
+     milkEntry: 'Milk Entry',
++    buffalo: 'Buffalo',
+     orders: 'Orders',
+     payments: 'Payments',
+     customers: 'Customers',
+     expenses: 'Expenses',
++    broadcaster: 'Broadcaster',
+     analytics: 'Analytics',
+     
+     // Common
+@@ -87,100 +89,16 @@ const translations = {
+     deleteConfirm: 'Are you sure you want to delete?',
+     networkError: 'Network error. Please try again.',
+   },
+-  ta: {
+-    // Navigation
+-    dashboard: 'ட্যাষ்போர்டு',
+-    milkEntry: 'பால் எண்ணெய்',
+-    orders: ' ஆர்டர்கள்',
+-    payments: 'பணம்',
+-    customers: 'வாடிக்கையாளர்கள்',
+-    expenses: 'செலவுகள்',
+-    analytics: 'பகுப்பாய்வு',
+-    
+-    // Common
+-    save: 'சேமி',
+-    cancel: 'ரத்து',
+-    delete: 'அழி',
+-    edit: 'திருத்து',
+-    add: 'சேர்',
+-    search: 'தேடு',
+-    filter: 'வடிகட்டு',
+-    export: 'ஏற்று',
+-    loading: 'ஏற்றுகிறது...',
+-    noData: 'தரவு இல்லை',
+-    success: 'வெற்றி',
+-    error: 'பிழை',
+-    warning: 'எச்சரிக்கை',
+-    confirm: 'உறுதிப்படுத்து',
+-    
+-    // Auth
+-    login: 'உள்நுழை',
+-    logout: 'வெளியேறு',
+-    register: 'பதிவு',
+-    username: 'பயன்பாப்பு பெயர்',
+-    password: 'கடவுச்சொல்',
+-    phone: 'தொலைபேசி',
+-    email: 'மின்னஞ்சல்',
+-    
+-    // Dashboard
+-    welcomeBack: 'மீண்டும் வரவேற்கிறோம்!',
+-    todayOrders: 'இன்றைய ஆர்டர்கள்',
+-    totalCustomers: 'மொத்த வாடிக்கையாளர்கள்',
+-    totalRevenue: 'மொத்த வருமானம்',
+-    pendingOrders: 'நிலுவையில் உள்ள ஆர்டர்கள்',
+-    recentOrders: 'சமீபத்திய ஆர்டர்கள்',
+-    
+-    // Milk
+-    quantity: 'அளவு (L)',
+-    rate: 'விகிதம் (₹/L)',
+-    fat: 'கொழுப்பு %',
+-    snf: 'எஸ்என்எஃப் %',
+-    session: 'அமர்வு',
+-    morning: 'காலை',
+-    evening: 'மாலை',
+-    
+-    // Status
+-    pending: 'நிலுவையில்',
+-    confirmed: 'உறுதிப்படுத்தப்பட்டது',
+-    cancelled: 'ரத்து',
+-    accepted: 'ஏற்கப்பட்டது',
+-    rejected: 'மறுக்கப்பட்டது',
+-    paid: 'பணம் செலுத்தியது',
+-    
+-    // Actions
+-    accept: 'ஏற்க',
+-    reject: 'மறு',
+-    viewDetails: 'விவரங்களைக் காண்க',
+-    
+-    // Settings
+-    settings: 'அமைகள்',
+-    profile: 'சுயவிவரம்',
+-    language: 'மொழி',
+-    theme: 'தீம்',
+-    darkMode: 'கரு Mode',
+-    lightMode: 'வெள்ளை Mode',
+-    
+-    // Notifications
+-    notifications: 'அறிவிப்புகள்',
+-    newOrder: 'புதிய ஆர்டர்',
+-    orderAccepted: 'ஆர்டர் ஏற்கப்பட்டது',
+-    orderRejected: 'ஆர்டர் மறுக்கப்பட்டது',
+-    paymentReceived: 'பணம் பெறப்பட்டது',
+-    markAllRead: 'அனைத்தையும் படித்ததாகக் குறி',
+-    
+-    // Messages
+-    savedSuccess: 'வெற்றிகரமாக சேமிக்கப்பட்டது',
+-    deleteConfirm: 'நீக்க விரும்புகிறீர்களா?',
+-    networkError: 'பிழை. மீண்டும் முயற்சிக்கவும்.',
+-  },
+   hi: {
+     // Navigation
+     dashboard: 'डैशबोर्ड',
+     milkEntry: 'दूध प्रविष्टि',
+-    orders: 'आर्डर',
++    buffalo: 'भैंस प्रबंधन',
++    orders: 'आर्डर सूची',
+     payments: 'भुगतान',
+     customers: 'ग्राहक',
+     expenses: 'खर्च',
++    broadcaster: 'प्रसारक',
+     analytics: 'विश्लेषण',
+     
+     // Common
+@@ -258,6 +176,94 @@ const translations = {
+     savedSuccess: 'सफलतापूर्वक सहेजा गया',
+     deleteConfirm: 'क्या आप हटाना चाहते हैं?',
+     networkError: 'त्रुटि। पुनः प्रयास करें।',
++  },
++  te: {
++    // Navigation
++    dashboard: 'డాష్‌బోర్డ్',
++    milkEntry: 'పాల నమోదు',
++    buffalo: 'గేదెల నిర్వహణ',
++    orders: 'ఆర్డర్లు',
++    payments: 'చెల్లింపులు',
++    customers: 'వినియోగదారులు',
++    expenses: 'ఖర్చులు',
++    broadcaster: 'సమాచార ప్రసారం',
++    analytics: 'విశ్లేషణలు',
++    
++    // Common
++    save: 'సేవ్ చేయి',
++    cancel: 'రద్దు చేయి',
++    delete: 'తొలగించు',
++    edit: 'సవరించు',
++    add: 'జోడించు',
++    search: 'వెతకండి',
++    filter: 'వడపోత',
++    export: 'ఎగుమతి',
++    loading: 'లోడ్ అవుతోంది...',
++    noData: 'డేటా అందుబాటులో లేదు',
++    success: 'విజయం',
++    error: 'లోపం',
++    warning: 'హెచ్చరిక',
++    confirm: 'నిర్ధారించు',
++    
++    // Auth
++    login: 'లాగిన్',
++    logout: 'లాగ్అవుట్',
++    register: 'నమోదు చేయి',
++    username: 'వినియోగదారు పేరు',
++    password: 'పాస్‌వర్డ్',
++    phone: 'ఫోన్ నంబర్',
++    email: 'ఈమెయిల్',
++    
++    // Dashboard
++    welcomeBack: 'మళ్ళీ స్వాగతం!',
++    todayOrders: 'ఈరోజు ఆర్డర్లు',
++    totalCustomers: 'మొత్తం వినియోగదారులు',
++    totalRevenue: 'మొత్తం రాబడి',
++    pendingOrders: 'పెండింగ్ ఆర్డర్లు',
++    recentOrders: 'ఇటీవలి ఆర్డర్లు',
++    
++    // Milk
++    quantity: 'పరిమాణం (లీటర్లు)',
++    rate: 'ధర (₹/లీటర్)',
++    fat: 'ఫ్యాట్ %',
++    snf: 'ఎస్.ఎన్.ఎఫ్ %',
++    session: 'సమయం',
++    morning: 'ఉదయం',
++    evening: 'సాయంత్రం',
++    
++    // Status
++    pending: 'పెండింగ్',
++    confirmed: 'స్థిరపడింది',
++    cancelled: 'రద్దు చేయబడింది',
++    accepted: 'ఆమోదించబడింది',
++    rejected: 'తిరస్కరించబడింది',
++    paid: 'చెల్లించబడింది',
++    
++    // Actions
++    accept: 'ఆమోదించు',
++    reject: 'తిరస్కరించు',
++    viewDetails: 'వివరాలు చూడు',
++    
++    // Settings
++    settings: 'సెట్టింగ్లు',
++    profile: 'ప్రొఫైల్',
++    language: 'భాష',
++    theme: 'థీమ్',
++    darkMode: 'డార్క్ మోడ్',
++    lightMode: 'లైట్ మోడ్',
++    
++    // Notifications
++    notifications: 'నోటిఫికేషన్లు',
++    newOrder: 'కొత్త ఆర్డర్ వచ్చింది',
++    orderAccepted: 'ఆర్డర్ ఆమోదించబడింది',
++    orderRejected: 'ఆర్డర్ తిరస్కరించబడింది',
++    paymentReceived: 'చెల్లింపు అందింది',
++    markAllRead: 'అన్నీ చదివినట్లు గుర్తించు',
++    
++    // Messages
++    savedSuccess: 'విజయవంతంగా సేవ్ చేయబడింది',
++    deleteConfirm: 'మీరు ఖచ్చితంగా తొలగించాలనుకుంటున్నారా?',
++    networkError: 'నెట్‌వర్క్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+   }
+ };
+ 
+diff --git a/frontend/src/hooks/useAdminDashboard.js b/frontend/src/hooks/useAdminDashboard.js
+index f4043f7..70ffa74 100644
+--- a/frontend/src/hooks/useAdminDashboard.js
++++ b/frontend/src/hooks/useAdminDashboard.js
+@@ -47,6 +47,14 @@ async function fetchAdminDashboard() {
+       totalExpenses: totalExpenses.toFixed(2),
+     },
+     recentOrders: orders.slice(0, 8),
++    // Expose raw data arrays to power client-side AI forecasting and statistical models
++    rawData: {
++      users,
++      milk,
++      orders,
++      payments,
++      expenses
++    }
+   };
+ }
+ 
+diff --git a/frontend/src/lib/aiEngine.js b/frontend/src/lib/aiEngine.js
+new file mode 100644
+index 0000000..d7c8a24
+--- /dev/null
++++ b/frontend/src/lib/aiEngine.js
+@@ -0,0 +1,246 @@
++/**
++ * RaithuPalu Self-Contained AI & Statistical Insights Engine
++ * Provides production-grade business forecasts, churn predictions, and anomaly detection
++ * using actual historical dairy data from the database.
++ */
++
++/**
++ * 1. Demand & Production Forecasting (Linear Regression / Trend Analysis)
++ * Forecasts the next 7 days of milk production based on historical daily entries.
++ */
++export function forecastNextWeek(milkEntries) {
++  if (!milkEntries || milkEntries.length < 3) {
++    return {
++      forecast: [],
++      trend: 'stable',
++      confidence: 'low',
++      avgDailyQty: 0
++    };
++  }
++
++  // Aggregate milk by date (YYYY-MM-DD)
++  const dailyTotals = {};
++  milkEntries.forEach(entry => {
++    if (!entry.date) return;
++    const dateStr = new Date(entry.date).toISOString().split('T')[0];
++    dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + (Number(entry.quantity) || 0);
++  });
++
++  const dates = Object.keys(dailyTotals).sort();
++  const quantities = dates.map(d => dailyTotals[d]);
++
++  if (dates.length < 2) {
++    return {
++      forecast: [],
++      trend: 'stable',
++      confidence: 'low',
++      avgDailyQty: quantities[0] || 0
++    };
++  }
++
++  // Simple Linear Regression: y = mx + c
++  // x: day index, y: milk quantity
++  const n = quantities.length;
++  let sumX = 0;
++  let sumY = 0;
++  let sumXY = 0;
++  let sumXX = 0;
++
++  for (let i = 0; i < n; i++) {
++    sumX += i;
++    sumY += quantities[i];
++    sumXY += i * quantities[i];
++    sumXX += i * i;
++  }
++
++  const denominator = (n * sumXX - sumX * sumX);
++  const slope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0;
++  const intercept = (sumY - slope * sumX) / n;
++
++  // Generate 7-day forecast
++  const forecast = [];
++  const lastDateObj = new Date(dates[dates.length - 1]);
++  const avgDailyQty = sumY / n;
++
++  for (let i = 1; i <= 7; i++) {
++    const nextDate = new Date(lastDateObj);
++    nextDate.setDate(lastDateObj.getDate() + i);
++    const dateStr = nextDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
++    
++    // Predicted value cap to avoid negative predictions or extreme spikes
++    let predictedQty = slope * (n + i - 1) + intercept;
++    if (predictedQty < 0) predictedQty = avgDailyQty * 0.8; // Fallback to safe lower bound
++    if (predictedQty > avgDailyQty * 2) predictedQty = avgDailyQty * 1.2; // Fallback to safe upper bound
++
++    forecast.push({
++      date: dateStr,
++      predictedQty: Number(predictedQty.toFixed(1))
++    });
++  }
++
++  let trend = 'stable';
++  if (slope > 0.1) trend = 'increasing';
++  else if (slope < -0.1) trend = 'declining';
++
++  const confidence = n > 14 ? 'high' : n > 7 ? 'medium' : 'low';
++
++  return {
++    forecast,
++    trend,
++    confidence,
++    avgDailyQty: Number(avgDailyQty.toFixed(1)),
++    slope: Number(slope.toFixed(2))
++  };
++}
++
++/**
++ * 2. Customer Churn Risk Prediction
++ * Detects customers at risk of churn based on inactive milk records.
++ */
++export function predictCustomerChurn(customers, milkEntries) {
++  if (!customers || customers.length === 0) return [];
++
++  const activeCustomers = customers.filter(u => u.role === 'customer' && u.isActive);
++  const now = new Date();
++  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
++
++  // Map latest milk entry date per customer
++  const latestEntryPerCustomer = {};
++  milkEntries.forEach(entry => {
++    const customerId = entry.userId?._id || entry.userId;
++    if (!customerId) return;
++    const entryDate = new Date(entry.date);
++    if (!latestEntryPerCustomer[customerId] || entryDate > latestEntryPerCustomer[customerId]) {
++      latestEntryPerCustomer[customerId] = entryDate;
++    }
++  });
++
++  const churnRisks = [];
++
++  activeCustomers.forEach(customer => {
++    const lastSeenDate = latestEntryPerCustomer[customer._id];
++    
++    if (!lastSeenDate) {
++      // Registered but has never taken milk deliveries
++      churnRisks.push({
++        customer,
++        daysInactive: -1,
++        riskLevel: 'medium',
++        reason: 'New signup — no delivery entries recorded yet.'
++      });
++      return;
++    }
++
++    const diffDays = Math.floor((now - lastSeenDate) / ONE_DAY_MS);
++
++    if (diffDays >= 7) {
++      let riskLevel = 'medium';
++      let reason = `Inactive for ${diffDays} days. Deliveries paused recently.`;
++      
++      if (diffDays >= 14) {
++        riskLevel = 'high';
++        reason = `Highly critical: Inactive for ${diffDays} days without vacation pause.`;
++      }
++
++      churnRisks.push({
++        customer,
++        daysInactive: diffDays,
++        riskLevel,
++        reason,
++        lastActiveDate: lastSeenDate.toLocaleDateString('en-IN')
++      });
++    }
++  });
++
++  // Sort by highest risk
++  return churnRisks.sort((a, b) => b.daysInactive - a.daysInactive);
++}
++
++/**
++ * 3. Anomalies & Yield Dropping Detection
++ * Highlights sudden production drops or delivery discrepancies.
++ */
++export function detectAnomalies(milkEntries) {
++  if (!milkEntries || milkEntries.length < 5) return [];
++
++  // Group by date
++  const dailyTotals = {};
++  milkEntries.forEach(entry => {
++    if (!entry.date) return;
++    const dateStr = new Date(entry.date).toISOString().split('T')[0];
++    dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + (Number(entry.quantity) || 0);
++  });
++
++  const dates = Object.keys(dailyTotals).sort();
++  const quantities = dates.map(d => dailyTotals[d]);
++
++  if (dates.length < 5) return [];
++
++  const anomalies = [];
++  
++  // Calculate running 5-day moving average and standard deviation
++  for (let i = 4; i < dates.length; i++) {
++    const history = quantities.slice(i - 4, i); // past 4 days
++    const avg = history.reduce((sum, q) => sum + q, 0) / 4;
++    const current = quantities[i];
++
++    // Check if current day drops by more than 40% from 4-day average
++    if (avg > 10 && current < avg * 0.6) {
++      const dropPct = ((avg - current) / avg) * 100;
++      anomalies.push({
++        date: new Date(dates[i]).toLocaleDateString('en-IN'),
++        currentYield: current.toFixed(1),
++        avgYield: avg.toFixed(1),
++        dropPercentage: dropPct.toFixed(0),
++        severity: dropPct > 50 ? 'high' : 'medium',
++        type: 'production_drop',
++        message: `Milk supply dropped suddenly by ${dropPct.toFixed(0)}% from average (${current.toFixed(1)}L vs avg ${avg.toFixed(1)}L).`
++      });
++    }
++  }
++
++  return anomalies.reverse();
++}
++
++/**
++ * 4. Revenue Forecasting
++ * Projects next month's earnings using linear trend or current run-rate.
++ */
++export function forecastRevenue(payments) {
++  if (!payments || payments.length === 0) {
++    return { predictedNextMonth: 0, currentRunRate: 0, deltaPercentage: 0 };
++  }
++
++  // Parse payment months & totals
++  const monthlyTotals = {};
++  payments.forEach(p => {
++    if (!p.month || !p.totalAmount) return;
++    monthlyTotals[p.month] = (monthlyTotals[p.month] || 0) + Number(p.totalAmount);
++  });
++
++  const months = Object.keys(monthlyTotals);
++  const amounts = months.map(m => monthlyTotals[m]);
++
++  if (amounts.length === 0) {
++    return { predictedNextMonth: 0, currentRunRate: 0, deltaPercentage: 0 };
++  }
++
++  const currentRunRate = amounts[amounts.length - 1] || 0;
++  let predictedNextMonth = currentRunRate;
++  let deltaPercentage = 0;
++
++  if (amounts.length >= 2) {
++    const prevMonth = amounts[amounts.length - 2];
++    if (prevMonth > 0) {
++      deltaPercentage = ((currentRunRate - prevMonth) / prevMonth) * 100;
++      // Simple projection factoring in the delta
++      predictedNextMonth = currentRunRate * (1 + (deltaPercentage / 100) * 0.5);
++    }
++  }
++
++  return {
++    predictedNextMonth: Number(predictedNextMonth.toFixed(0)),
++    currentRunRate: Number(currentRunRate.toFixed(0)),
++    deltaPercentage: Number(deltaPercentage.toFixed(1))
++  };
++}
+diff --git a/frontend/src/lib/pdfGenerator.js b/frontend/src/lib/pdfGenerator.js
+index 595aca9..b5eb384 100644
+--- a/frontend/src/lib/pdfGenerator.js
++++ b/frontend/src/lib/pdfGenerator.js
+@@ -59,8 +59,8 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
+ 
+   doc.setFontSize(10);
+   doc.setTextColor(80, 80, 80);
+-  const headers = ['Date', 'Session', 'Quantity', 'Price'];
+-  const colWidths = [50, 40, 40, 40];
++  const headers = ['Date', 'Session', 'Quantity', 'Price', 'Type'];
++  const colWidths = [45, 30, 30, 30, 35];
+   let x = 20;
+ 
+   headers.forEach((header, i) => {
+@@ -78,6 +78,7 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
+     const session = entry.session.charAt(0).toUpperCase() + entry.session.slice(1);
+     const quantity = entry.quantity >= 1 ? `${entry.quantity}L` : `${entry.quantity * 1000}ml`;
+     const price = `₹${entry.totalPrice.toFixed(2)}`;
++    const typeText = entry.entryType === 'ORDER' ? 'Ordered' : 'Normal';
+ 
+     x = 20;
+     doc.text(date, x, y);
+@@ -87,6 +88,8 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
+     doc.text(quantity, x, y);
+     x += colWidths[2];
+     doc.text(price, x, y);
++    x += colWidths[3];
++    doc.text(typeText, x, y);
+     y += 7;
+ 
+     if (y > 270) {
+diff --git a/frontend/src/pages/admin/Broadcast.jsx b/frontend/src/pages/admin/Broadcast.jsx
+new file mode 100644
+index 0000000..a80c5dd
+--- /dev/null
++++ b/frontend/src/pages/admin/Broadcast.jsx
+@@ -0,0 +1,260 @@
++import React, { useState } from 'react';
++import { motion } from 'framer-motion';
++import { useQuery } from '@tanstack/react-query';
++import { userService, notificationService } from '../../services/api';
++import { extractListFromResponse } from '../../lib/apiNormalize';
++import PageHeader from '../../components/PageHeader';
++import Button from '../../components/Button';
++import './AdminPages.css';
++
++const BROADCAST_PRESETS = [
++  {
++    icon: '🌧️',
++    label: 'Rain Delay',
++    text: 'Dear customer, our milk delivery is delayed by 30-40 minutes today due to heavy rainfall. We appreciate your patience and support! - RaithuPalu Dairy'
++  },
++  {
++    icon: '🐄',
++    label: 'Fresh Ghee Stock',
++    text: 'Dear customer, our fresh, organic pure homemade Ghee is back in stock! Order yours today via your RaithuPalu customer portal. - RaithuPalu Dairy'
++  },
++  {
++    icon: '🧾',
++    label: 'Payment Due alert',
++    text: 'Dear customer, please review your outstanding monthly milk statement in your billing portal and complete your payment. Thank you! - RaithuPalu Dairy'
++  },
++  {
++    icon: '🌾',
++    label: 'Festive Holiday Pause',
++    text: 'Dear customer, our deliveries will be paused on the upcoming festive holiday. Please adjust your order schedule or message us with changes. - RaithuPalu Dairy'
++  }
++];
++
++const Broadcast = () => {
++  const [targetUserId, setTargetUserId] = useState('all');
++  const [message, setMessage] = useState('');
++  const [sending, setDeletingId] = useState(false);
++  const [statusBanner, setSubmitStatus] = useState(null);
++  const [resultsLog, setResultsLog] = useState([]);
++
++  // Fetch active customers
++  const { data: usersData, isLoading: usersLoading } = useQuery({
++    queryKey: ['admin', 'users-list'],
++    queryFn: async () => {
++      const response = await userService.getAll();
++      const list = extractListFromResponse(response);
++      return list.filter(u => u.role === 'customer' && u.isActive);
++    }
++  });
++
++  const customers = usersData || [];
++
++  const handleApplyPreset = (text) => {
++    setMessage(text);
++  };
++
++  const handleSendBroadcast = async (e) => {
++    e.preventDefault();
++    if (!message.trim()) {
++      setSubmitStatus({
++        type: 'error',
++        message: 'Please write a message before sending.'
++      });
++      return;
++    }
++
++    try {
++      setDeletingId(true);
++      setSubmitStatus(null);
++      
++      const payload = {
++        targetUserId,
++        message: message.trim()
++      };
++
++      const response = await notificationService.broadcast(payload);
++      
++      if (response.data?.success) {
++        setSubmitStatus({
++          type: 'success',
++          message: response.data.message || 'Broadcast completed successfully!'
++        });
++        
++        // Log individual results
++        if (response.data.results) {
++          setResultsLog(response.data.results);
++        }
++        
++        // Clear message box on success
++        setMessage('');
++      } else {
++        setSubmitStatus({
++          type: 'error',
++          message: 'Failed to process broadcast.'
++        });
++      }
++    } catch (err) {
++      console.error('Error broadcasting message:', err);
++      setSubmitStatus({
++        type: 'error',
++        message: err.message || 'Failed to dispatch alert. Check your network or Twilio API credentials.'
++      });
++    } finally {
++      setDeletingId(false);
++    }
++  };
++
++  return (
++    <div className="admin-page">
++      <PageHeader title="Notification Broadcaster" subtitle="Dispatch high-importance alerts via WhatsApp and In-App notification logs" />
++
++      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px' }} className="buffalo-details-grid">
++        {/* Form Column */}
++        <motion.div 
++          initial={{ opacity: 0, y: 20 }}
++          animate={{ opacity: 1, y: 0 }}
++          className="page-card"
++          style={{ padding: '24px' }}
++        >
++          <h3 className="section-title" style={{ fontSize: '1.2rem', marginBottom: '20px' }}>📢 Compose New Alert</h3>
++          
++          <form onSubmit={handleSendBroadcast} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
++            {/* Target Audience */}
++            <div className="form-group-custom">
++              <label className="form-label">Target Audience</label>
++              {usersLoading ? (
++                <div style={{ fontSize: '0.9rem', color: '#999' }}>Loading clients roster...</div>
++              ) : (
++                <select
++                  className="form-select-custom"
++                  value={targetUserId}
++                  onChange={(e) => setTargetUserId(e.target.value)}
++                  style={{ width: '100%' }}
++                >
++                  <option value="all">🌐 All Active Customers ({customers.length} users)</option>
++                  {customers.map(c => (
++                    <option key={c._id} value={c._id}>
++                      👤 @{c.username} ({c.phone || 'No Phone'})
++                    </option>
++                  ))}
++                </select>
++              )}
++            </div>
++
++            {/* Presets */}
++            <div className="form-group-custom">
++              <label className="form-label" style={{ marginBottom: '10px' }}>💡 Message Templates</label>
++              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
++                {BROADCAST_PRESETS.map((preset) => (
++                  <button
++                    key={preset.label}
++                    type="button"
++                    className="filter-button"
++                    onClick={() => handleApplyPreset(preset.text)}
++                    style={{ padding: '6px 12px', fontSize: '0.8rem', minHeight: '36px', display: 'flex', alignItems: 'center', gap: '6px' }}
++                  >
++                    <span>{preset.icon}</span> {preset.label}
++                  </button>
++                ))}
++              </div>
++            </div>
++
++            {/* Message Textbox */}
++            <div className="form-group-custom">
++              <label className="form-label">Alert Message (WhatsApp & In-App)</label>
++              <textarea
++                className="form-input"
++                rows={6}
++                value={message}
++                onChange={(e) => setMessage(e.target.value)}
++                placeholder="Type your message here..."
++                required
++                style={{ resize: 'vertical', width: '100%', fontFamily: 'inherit', padding: '12px' }}
++              />
++              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.8rem', color: '#999' }}>
++                <span>Keep text clear and brief.</span>
++                <span>{message.length} characters</span>
++              </div>
++            </div>
++
++            {statusBanner && (
++              <div className={`alert ${statusBanner.type === 'success' ? 'alert-success' : 'alert-error'}`}>
++                {statusBanner.type === 'success' ? '✓ ' : '⚠️ '} {statusBanner.message}
++              </div>
++            )}
++
++            <Button
++              type="submit"
++              variant="primary"
++              disabled={sending}
++              style={{ padding: '14px 28px', width: '100%' }}
++            >
++              {sending ? '🚀 Broadcasting Alert...' : '🚀 Dispatch Broadcast Alert'}
++            </Button>
++          </form>
++        </motion.div>
++
++        {/* Info & Logs Column */}
++        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
++          {/* Dispatch summary guide */}
++          <motion.div 
++            initial={{ opacity: 0, y: 20 }}
++            animate={{ opacity: 1, y: 0 }}
++            transition={{ delay: 0.1 }}
++            className="page-card"
++            style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(37,99,235,0.02), rgba(37,99,235,0.06))', border: '1px solid rgba(37,99,235,0.15)' }}
++          >
++            <h4 className="card-title" style={{ fontSize: '1.1rem', marginBottom: '12px', color: '#2563eb' }}>ℹ️ Multi-Channel Dispatch</h4>
++            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.88rem', color: 'var(--ds-text-muted)', lineHeight: '1.6', display: 'flex', flexDirection: 'column', gap: '8px' }}>
++              <li><strong>Twilio WhatsApp API</strong>: Triggers immediate push message warnings to customer mobile phones.</li>
++              <li><strong>In-App Log Notifications</strong>: Injects an alert entry in the customer's feed on their personal dashboard.</li>
++              <li><strong>Auto-Formatting</strong>: Phone numbers are automatically converted to clean +91 Indian format on dispatch.</li>
++              <li><strong>Brute Prevention</strong>: Uses exponential backoff handler to retry on network dropouts.</li>
++            </ul>
++          </motion.div>
++
++          {/* Results table */}
++          {resultsLog.length > 0 && (
++            <motion.div 
++              initial={{ opacity: 0, scale: 0.95 }}
++              animate={{ opacity: 1, scale: 1 }}
++              className="page-card"
++              style={{ padding: '24px' }}
++            >
++              <h4 className="card-title" style={{ fontSize: '1.1rem', marginBottom: '16px' }}>📋 Last Broadcast Dispatch Log</h4>
++              
++              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
++                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
++                  <thead>
++                    <tr style={{ borderBottom: '2px solid var(--ds-border)', textAlign: 'left' }}>
++                      <th style={{ padding: '8px', color: 'var(--ds-text-muted)' }}>Customer</th>
++                      <th style={{ padding: '8px', color: 'var(--ds-text-muted)' }}>WhatsApp Push</th>
++                    </tr>
++                  </thead>
++                  <tbody>
++                    {resultsLog.map((log) => (
++                      <tr key={log.userId} style={{ borderBottom: '1px solid var(--ds-border)' }}>
++                        <td style={{ padding: '8px', fontWeight: '600', color: 'var(--ds-text)' }}>@{log.username}</td>
++                        <td style={{ padding: '8px' }}>
++                          {log.whatsappSent ? (
++                            <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Dispatched</span>
++                          ) : (
++                            <span style={{ color: '#dc2626', fontWeight: 'bold' }} title={log.error}>
++                              ✕ Failed ({log.error || 'Unknown'})
++                            </span>
++                          )}
++                        </td>
++                      </tr>
++                    ))}
++                  </tbody>
++                </table>
++              </div>
++            </motion.div>
++          )}
++        </div>
++      </div>
++    </div>
++  );
++};
++
++export default Broadcast;
+\ No newline at end of file
+diff --git a/frontend/src/pages/admin/Dashboard.jsx b/frontend/src/pages/admin/Dashboard.jsx
+index 3598d72..fd12e80 100644
+--- a/frontend/src/pages/admin/Dashboard.jsx
++++ b/frontend/src/pages/admin/Dashboard.jsx
+@@ -1,11 +1,12 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import { motion } from 'framer-motion';
+ import { useAdminDashboard } from '../../hooks/useAdminDashboard';
+ import { PageError } from '../../components/PageState';
+ import { DashboardSkeleton } from '../../components/Skeleton';
+ import DataTable from '../../components/DataTable';
+-import './AdminPages.css';
+ import PageHeader from '../../components/PageHeader';
++import { forecastNextWeek, predictCustomerChurn, detectAnomalies, forecastRevenue } from '../../lib/aiEngine';
++import './AdminPages.css';
+ 
+ const containerVariants = {
+   hidden: { opacity: 0 },
+@@ -22,6 +23,7 @@ const itemVariants = {
+ 
+ const AdminDashboard = () => {
+   const { data, isPending, isError, error, refetch } = useAdminDashboard();
++  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ai'
+ 
+   if (isPending) {
+     return <DashboardSkeleton />;
+@@ -39,100 +41,326 @@ const AdminDashboard = () => {
+     );
+   }
+ 
+-  const { stats, recentOrders } = data;
++  const { stats, recentOrders, rawData } = data;
++  const { users, milk, payments } = rawData;
++
++  // Run AI / Statistical models
++  const productionModel = forecastNextWeek(milk);
++  const churnAnalysis = predictCustomerChurn(users, milk);
++  const anomalies = detectAnomalies(milk);
++  const revenueModel = forecastRevenue(payments);
+ 
+   return (
+     <div className="admin-page">
+-      <PageHeader title="Dashboard" subtitle="Operations overview — data refreshes when you revisit this page" />
+-
+-      <motion.section
+-        className="stats-grid stats-grid--dashboard"
+-        variants={containerVariants}
+-        initial="hidden"
+-        animate="visible"
+-        aria-label="Key metrics"
+-      >
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>👥</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Customers</p>
+-            <h2 className="stat-value">{stats.totalCustomers}</h2>
+-          </div>
+-          <div className="stat-accent-line" />
+-        </motion.div>
++      <PageHeader 
++        title="Admin Portal" 
++        subtitle="Operations overview & AI-powered business predictions" 
++      />
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>🥛</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Today&apos;s milk</p>
+-            <h2 className="stat-value">{stats.todayMilk} L</h2>
+-          </div>
+-          <div className="stat-accent-line" />
+-        </motion.div>
++      {/* PORTAL TABS */}
++      <div className="tabs-container" style={{ marginBottom: '32px' }}>
++        <button
++          type="button"
++          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
++          onClick={() => setActiveTab('overview')}
++        >
++          📊 Operations Overview
++        </button>
++        <button
++          type="button"
++          className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}
++          onClick={() => setActiveTab('ai')}
++          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
++        >
++          ✨ MilkFlow AI™ Predictor
++        </button>
++      </div>
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>💰</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Collected this month</p>
+-            <h2 className="stat-value">₹{Number(stats.monthlyRevenue).toLocaleString('en-IN')}</h2>
+-          </div>
+-          <div className="stat-accent-line" />
+-        </motion.div>
++      {activeTab === 'overview' ? (
++        <motion.div
++          variants={containerVariants}
++          initial="hidden"
++          animate="visible"
++        >
++          {/* Key Metrics */}
++          <section
++            className="stats-grid stats-grid--dashboard"
++            aria-label="Key metrics"
++          >
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>👥</div>
++              <div className="stat-content">
++                <p className="stat-label">Customers</p>
++                <h2 className="stat-value">{stats.totalCustomers}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>📦</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Pending orders</p>
+-            <h2 className="stat-value">{stats.pendingOrders}</h2>
+-          </div>
+-          <div className="stat-accent-line" />
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>🥛</div>
++              <div className="stat-content">
++                <p className="stat-label">Today&apos;s milk</p>
++                <h2 className="stat-value">{stats.todayMilk} L</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>💰</div>
++              <div className="stat-content">
++                <p className="stat-label">Collected this month</p>
++                <h2 className="stat-value">₹{Number(stats.monthlyRevenue).toLocaleString('en-IN')}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>📦</div>
++              <div className="stat-content">
++                <p className="stat-label">Pending orders</p>
++                <h2 className="stat-value">{stats.pendingOrders}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>📋</div>
++              <div className="stat-content">
++                <p className="stat-label">Total expenses</p>
++                <h2 className="stat-value">₹{Number(stats.totalExpenses).toLocaleString('en-IN')}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++          </section>
++
++          {/* Recent Orders Table */}
++          <motion.section
++            className="premium-card dashboard-orders-card"
++            initial={{ opacity: 0, y: 20 }}
++            animate={{ opacity: 1, y: 0 }}
++            transition={{ delay: 0.15, duration: 0.45 }}
++            aria-labelledby="recent-orders-heading"
++          >
++            <div className="table-header">
++              <h2 id="recent-orders-heading" className="table-title" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ds-text)', fontFamily: 'Space Grotesk' }}>
++                Recent orders
++              </h2>
++            </div>
++
++            <DataTable
++              data={recentOrders}
++              emptyMessage="No orders yet"
++              animate={false}
++              columns={[
++                { label: 'ID', key: 'orderId', className: 'order-id', render: (_, row) => row._id?.slice(-8) || '—' },
++                { label: 'Customer', key: 'customer', className: 'customer-name', render: (_, row) => row.userId?.username || '—' },
++                { label: 'Qty', key: 'quantity', className: 'amount', render: (_, row) => row.quantity ?? '—' },
++                {
++                  label: 'Status',
++                  render: (_, row) => (
++                    <span className={`status-badge status-${row.status || 'pending'}`}>
++                      {row.status || 'pending'}
++                    </span>
++                  ),
++                },
++                { label: 'Date', key: 'createdAt', className: 'date', render: (_, row) => (row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-IN') : '—') },
++              ]}
++            />
++          </motion.section>
+         </motion.div>
++      ) : (
++        <motion.div
++          variants={containerVariants}
++          initial="hidden"
++          animate="visible"
++          style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
++        >
++          {/* AI Header & Overview Card */}
++          <motion.section variants={itemVariants} className="page-card" style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(76,175,80,0.04), rgba(45,95,63,0.06))', border: '1px solid rgba(76,175,80,0.2)' }}>
++            <h3 style={{ fontSize: '1.5rem', color: '#2d5f3f', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
++              <span>🔮</span> MilkFlow AI™ Smart Assistant
++            </h3>
++            <p style={{ margin: 0, color: 'var(--ds-text-muted)', fontSize: '0.95rem', lineHeight: '1.6' }}>
++              Predictive models have analyzed <strong>{milk.length}</strong> milk delivery entries, <strong>{users.length}</strong> user records, and <strong>{payments.length}</strong> billing profiles. 
++              The statistics below are calculated dynamically using linear regression, time-series, and activity-drop heuristics.
++            </p>
++          </motion.section>
++
++          {/* AI Forecasting Stats Row */}
++          <section className="stats-grid">
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon">📈</div>
++              <div className="stat-content">
++                <p className="stat-label">Predicted next month revenue</p>
++                <h2 className="stat-value">₹{revenueModel.predictedNextMonth.toLocaleString('en-IN')}</h2>
++              </div>
++              <div style={{ fontSize: '0.85rem', marginTop: '8px', color: revenueModel.deltaPercentage >= 0 ? '#16a34a' : '#ef4444', fontWeight: 'bold' }}>
++                {revenueModel.deltaPercentage >= 0 ? '▲' : '▼'} {Math.abs(revenueModel.deltaPercentage).toFixed(1)}% vs this month
++              </div>
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon">🐄</div>
++              <div className="stat-content">
++                <p className="stat-label">Estimated daily average yield</p>
++                <h2 className="stat-value">{productionModel.avgDailyQty} L</h2>
++              </div>
++              <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++                Production Trend: <span style={{ textTransform: 'capitalize', fontWeight: 'bold', color: productionModel.trend === 'increasing' ? '#16a34a' : productionModel.trend === 'declining' ? '#ef4444' : '#2563eb' }}>{productionModel.trend}</span>
++              </div>
++            </motion.div>
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>📋</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Total expenses</p>
+-            <h2 className="stat-value">₹{Number(stats.totalExpenses).toLocaleString('en-IN')}</h2>
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon">⚠️</div>
++              <div className="stat-content">
++                <p className="stat-label">Active churn warnings</p>
++                <h2 className="stat-value" style={{ color: churnAnalysis.length > 0 ? '#dc2626' : 'var(--ds-text)' }}>{churnAnalysis.length}</h2>
++              </div>
++              <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++                {churnAnalysis.filter(c => c.riskLevel === 'high').length} High-Risk Clients
++              </div>
++            </motion.div>
++          </section>
++
++          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }} className="buffalo-details-grid">
++            {/* column 1: production forecasting */}
++            <motion.div variants={itemVariants} className="page-card" style={{ padding: '24px' }}>
++              <div className="card-header" style={{ marginBottom: '16px' }}>
++                <h4 className="card-title" style={{ fontSize: '1.15rem' }}>🎯 7-Day Production Forecast</h4>
++                <span className="status-badge" style={{
++                  background: productionModel.confidence === 'high' ? '#dcfce7' : productionModel.confidence === 'medium' ? '#fef3c7' : '#fee2e2',
++                  color: productionModel.confidence === 'high' ? '#16a34a' : productionModel.confidence === 'medium' ? '#d97706' : '#ef4444',
++                }}>
++                  {productionModel.confidence} confidence
++                </span>
++              </div>
++              
++              {productionModel.forecast.length === 0 ? (
++                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--ds-text-muted)' }}>
++                  Not enough historical entries to generate a forecast. Keep recording daily milk collection.
++                </div>
++              ) : (
++                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
++                  {productionModel.forecast.map((f, i) => (
++                    <div key={f.date} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
++                      <span style={{ width: '80px', fontWeight: '600', color: 'var(--ds-text)', fontSize: '0.9rem' }}>{f.date}</span>
++                      
++                      {/* Custom styled progress bar showing predicted relative size */}
++                      <div style={{ flex: 1, height: '12px', background: 'var(--ds-surface-muted)', borderRadius: '6px', overflow: 'hidden' }}>
++                        <motion.div 
++                          initial={{ width: 0 }}
++                          animate={{ width: `${Math.min((f.predictedQty / (productionModel.avgDailyQty || 1)) * 50, 100)}%` }}
++                          transition={{ delay: i * 0.05, duration: 0.5 }}
++                          style={{ height: '100%', background: 'linear-gradient(90deg, #4caf50, #2563eb)', borderRadius: '6px' }}
++                        />
++                      </div>
++                      
++                      <span style={{ width: '60px', textAlign: 'right', fontWeight: 'bold', color: '#2d5f3f', fontSize: '0.9rem' }}>{f.predictedQty} L</span>
++                    </div>
++                  ))}
++                </div>
++              )}
++            </motion.div>
++
++            {/* column 2: churn alerts & anomalies */}
++            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
++              {/* Churn warnings card */}
++              <motion.div variants={itemVariants} className="page-card" style={{ padding: '24px' }}>
++                <h4 className="card-title" style={{ fontSize: '1.15rem', marginBottom: '16px' }}>🛡️ Customer Retention Alerts</h4>
++                
++                {churnAnalysis.length === 0 ? (
++                  <div style={{ padding: '16px', textAlign: 'center', color: '#16a34a', fontWeight: 'bold', background: '#dcfce7', borderRadius: '10px' }}>
++                    ✅ Great news! All customers are actively receiving deliveries.
++                  </div>
++                ) : (
++                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
++                    {churnAnalysis.map((item) => (
++                      <div 
++                        key={item.customer._id} 
++                        style={{ 
++                          padding: '12px', 
++                          border: `1px solid ${item.riskLevel === 'high' ? '#fca5a5' : '#fde047'}`, 
++                          background: item.riskLevel === 'high' ? '#fee2e2' : '#fef9c3',
++                          borderRadius: '10px'
++                        }}
++                      >
++                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
++                          <strong style={{ color: '#111827', fontSize: '0.9rem' }}>@{item.customer.username}</strong>
++                          <span style={{ 
++                            fontSize: '10px', 
++                            fontWeight: 'bold', 
++                            padding: '2px 8px', 
++                            borderRadius: '4px', 
++                            textTransform: 'uppercase',
++                            background: item.riskLevel === 'high' ? '#dc2626' : '#d97706',
++                            color: 'white'
++                          }}>
++                            {item.riskLevel} risk
++                          </span>
++                        </div>
++                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#374151', lineHeight: '1.4' }}>
++                          {item.reason} {item.lastActiveDate && `Last delivery: ${item.lastActiveDate}.`}
++                        </p>
++                        <div style={{ marginTop: '8px', display: 'flex', gap: '10px' }}>
++                          <a 
++                            href={`https://wa.me/91${item.customer.phone}`} 
++                            target="_blank" 
++                            rel="noopener noreferrer"
++                            style={{ fontSize: '11px', textDecoration: 'none', background: '#16a34a', color: 'white', padding: '4px 10px', borderRadius: '4px', fontWeight: 'bold' }}
++                          >
++                            💬 Chat WhatsApp
++                          </a>
++                          <a 
++                            href={`tel:${item.customer.phone}`} 
++                            style={{ fontSize: '11px', textDecoration: 'none', background: '#2563eb', color: 'white', padding: '4px 10px', borderRadius: '4px', fontWeight: 'bold' }}
++                          >
++                            📞 Call
++                          </a>
++                        </div>
++                      </div>
++                    ))}
++                  </div>
++                )}
++              </motion.div>
++
++              {/* Anomalies Card */}
++              <motion.div variants={itemVariants} className="page-card" style={{ padding: '24px' }}>
++                <h4 className="card-title" style={{ fontSize: '1.15rem', marginBottom: '16px' }}>⚠️ Production Anomalies</h4>
++                
++                {anomalies.length === 0 ? (
++                  <div style={{ padding: '16px', textAlign: 'center', color: '#2563eb', fontWeight: 'bold', background: '#dbeafe', borderRadius: '10px', fontSize: '0.9rem' }}>
++                    📊 Yield patterns stable. No sudden drops detected.
++                  </div>
++                ) : (
++                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
++                    {anomalies.slice(0, 3).map((anomaly, idx) => (
++                      <div 
++                        key={idx} 
++                        style={{ 
++                          padding: '12px', 
++                          borderLeft: '4px solid #ef4444', 
++                          background: 'var(--ds-surface-muted)',
++                          borderRadius: '0 8px 8px 0'
++                        }}
++                      >
++                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'var(--ds-text)', display: 'flex', justifyContent: 'space-between' }}>
++                          <span>📉 Sudden Drop Warning</span>
++                          <span style={{ color: '#ef4444' }}>{anomaly.date}</span>
++                        </div>
++                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--ds-text-muted)', lineHeight: '1.4' }}>
++                          {anomaly.message}
++                        </p>
++                      </div>
++                    ))}
++                  </div>
++                )}
++              </motion.div>
++            </div>
+           </div>
+-          <div className="stat-accent-line" />
+         </motion.div>
+-      </motion.section>
+-
+-      <motion.section
+-        className="premium-card dashboard-orders-card"
+-        initial={{ opacity: 0, y: 20 }}
+-        animate={{ opacity: 1, y: 0 }}
+-        transition={{ delay: 0.15, duration: 0.45 }}
+-        aria-labelledby="recent-orders-heading"
+-      >
+-        <div className="table-header">
+-          <h2 id="recent-orders-heading" className="table-title">
+-            Recent orders
+-          </h2>
+-        </div>
+-
+-        <DataTable
+-          data={recentOrders}
+-          emptyMessage="No orders yet"
+-          animate={false}
+-          columns={[
+-            { label: 'ID', key: 'orderId', className: 'order-id', render: (_, row) => row._id?.slice(-8) || '—' },
+-            { label: 'Customer', key: 'customer', className: 'customer-name', render: (_, row) => row.userId?.username || '—' },
+-            { label: 'Qty', key: 'quantity', className: 'amount', render: (_, row) => row.quantity ?? '—' },
+-            {
+-              label: 'Status',
+-              render: (_, row) => (
+-                <span className={`status-badge status-${row.status || 'pending'}`}>
+-                  {row.status || 'pending'}
+-                </span>
+-              ),
+-            },
+-            { label: 'Date', key: 'createdAt', className: 'date', render: (_, row) => (row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-IN') : '—') },
+-          ]}
+-        />
+-      </motion.section>
++      )}
+     </div>
+   );
+ };
+ 
+-export default AdminDashboard;
++export default AdminDashboard;
+\ No newline at end of file
+diff --git a/frontend/src/pages/admin/MilkEntry.jsx b/frontend/src/pages/admin/MilkEntry.jsx
+index 9720e82..e31f712 100644
+--- a/frontend/src/pages/admin/MilkEntry.jsx
++++ b/frontend/src/pages/admin/MilkEntry.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState, useCallback } from 'react';
++import React, { useState, useCallback, useMemo } from 'react';
+ import { AnimatePresence } from 'framer-motion';
+ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+ import { Link } from 'react-router-dom';
+@@ -20,6 +20,8 @@ const MilkEntry = () => {
+   const queryClient = useQueryClient();
+ 
+   const [showModal, setShowModal] = useState(false);
++  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'normal' | 'order'
++  const [sortOrder, setSortOrder] = useState('none'); // 'none' | 'normal' | 'order'
+ 
+   // Form state for modal
+   const [formData, setFormData] = useState({
+@@ -109,6 +111,7 @@ const MilkEntry = () => {
+       session: data.session,
+       date: dateOnly,
+       totalPrice: data.total,
++      entryType: "NORMAL", // Explicit manually entered type
+     });
+   };
+ 
+@@ -129,15 +132,68 @@ const MilkEntry = () => {
+     setSubmitStatus(null);
+   };
+ 
+-  // Calculate summary stats
+-  const summaryStats = listQuery.data ? (() => {
++  // Filter and sort entries dynamically
++  const processedEntries = useMemo(() => {
++    if (!listQuery.data?.entries) return [];
++    let result = [...listQuery.data.entries];
++    
++    // 1. Filter by type
++    if (typeFilter === 'normal') {
++      result = result.filter(e => !e.entryType || e.entryType.toUpperCase() === 'NORMAL');
++    } else if (typeFilter === 'order') {
++      result = result.filter(e => e.entryType && e.entryType.toUpperCase() === 'ORDER');
++    }
++    
++    // 2. Sort by type
++    if (sortOrder === 'normal') {
++      result.sort((a, b) => {
++        const typeA = (a.entryType || 'NORMAL').toUpperCase();
++        const typeB = (b.entryType || 'NORMAL').toUpperCase();
++        if (typeA === 'NORMAL' && typeB === 'ORDER') return -1;
++        if (typeA === 'ORDER' && typeB === 'NORMAL') return 1;
++        return 0;
++      });
++    } else if (sortOrder === 'order') {
++      result.sort((a, b) => {
++        const typeA = (a.entryType || 'NORMAL').toUpperCase();
++        const typeB = (b.entryType || 'NORMAL').toUpperCase();
++        if (typeA === 'ORDER' && typeB === 'NORMAL') return -1;
++        if (typeA === 'NORMAL' && typeB === 'ORDER') return 1;
++        return 0;
++      });
++    }
++    
++    return result;
++  }, [listQuery.data, typeFilter, sortOrder]);
++
++  // Calculate summary stats including custom sub-types requested
++  const summaryStats = useMemo(() => {
++    if (!listQuery.data?.entries) return null;
+     const { entries } = listQuery.data;
+     const totalEntries = entries.length;
+     const totalLitres = entries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+     const totalAmount = entries.reduce((sum, e) => sum + (e.totalPrice || 0), 0);
+     const avgCollection = totalEntries > 0 ? totalLitres / totalEntries : 0;
+-    return { totalEntries, totalLitres, totalAmount, avgCollection };
+-  })() : null;
++
++    // Ordered vs Normal counts
++    const normalEntriesCount = entries.filter(e => !e.entryType || e.entryType.toUpperCase() === 'NORMAL').length;
++    const orderedEntriesCount = entries.filter(e => e.entryType && e.entryType.toUpperCase() === 'ORDER').length;
++
++    // Ordered vs Normal volumes
++    const totalNormalMilk = entries.filter(e => !e.entryType || e.entryType.toUpperCase() === 'NORMAL').reduce((sum, e) => sum + (e.quantity || 0), 0);
++    const totalOrderedMilk = entries.filter(e => e.entryType && e.entryType.toUpperCase() === 'ORDER').reduce((sum, e) => sum + (e.quantity || 0), 0);
++
++    return {
++      totalEntries,
++      totalLitres,
++      totalAmount,
++      avgCollection,
++      normalEntries: normalEntriesCount,
++      orderedEntries: orderedEntriesCount,
++      totalNormalMilk,
++      totalOrderedMilk
++    };
++  }, [listQuery.data]);
+ 
+   if (listQuery.isPending) return <DashboardSkeleton />;
+ 
+@@ -151,7 +207,7 @@ const MilkEntry = () => {
+     );
+   }
+ 
+-  const { entries, users } = listQuery.data;
++  const { users } = listQuery.data;
+ 
+   return (
+     <div className="admin-page">
+@@ -168,6 +224,9 @@ const MilkEntry = () => {
+               {summaryStats?.totalEntries}
+               <span className="stat-unit"> records</span>
+             </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Normal: <strong>{summaryStats?.normalEntries}</strong> | Ordered: <strong>{summaryStats?.orderedEntries}</strong>
++            </div>
+           </div>
+         </div>
+ 
+@@ -177,9 +236,12 @@ const MilkEntry = () => {
+           <div className="stat-content">
+             <div className="stat-label">Total Litres</div>
+             <div className="stat-value">
+-              {summaryStats?.totalLitres}
++              {summaryStats?.totalLitres.toFixed(1)}
+               <span className="stat-unit"> L</span>
+             </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Normal: <strong>{summaryStats?.totalNormalMilk.toFixed(1)}L</strong> | Ordered: <strong>{summaryStats?.totalOrderedMilk.toFixed(1)}L</strong>
++            </div>
+           </div>
+         </div>
+ 
+@@ -189,7 +251,10 @@ const MilkEntry = () => {
+           <div className="stat-content">
+             <div className="stat-label">Total Amount</div>
+             <div className="stat-value">
+-              ₹{summaryStats?.totalAmount}
++              ₹{summaryStats?.totalAmount.toFixed(2)}
++            </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Calculations unchanged
+             </div>
+           </div>
+         </div>
+@@ -203,10 +268,44 @@ const MilkEntry = () => {
+               {summaryStats?.avgCollection.toFixed(1)}
+               <span className="stat-unit"> L</span>
+             </div>
++            <div style={{ fontSize: '0.8rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++              Dairy herd production summary
++            </div>
+           </div>
+         </div>
+       </div>
+ 
++      {/* Filter and sorting row */}
++      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
++        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
++          <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Type Filter:</label>
++          <select
++            value={typeFilter}
++            onChange={(e) => setTypeFilter(e.target.value)}
++            className="filter-select"
++            style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '120px' }}
++          >
++            <option value="all">All</option>
++            <option value="normal">Normal Only</option>
++            <option value="order">Ordered Only</option>
++          </select>
++        </div>
++
++        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
++          <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sort:</label>
++          <select
++            value={sortOrder}
++            onChange={(e) => setSortOrder(e.target.value)}
++            className="filter-select"
++            style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '140px' }}
++          >
++            <option value="none">Default (Date)</option>
++            <option value="normal">Normal First</option>
++            <option value="order">Ordered First</option>
++          </select>
++        </div>
++      </div>
++
+       {/* Recent Entries Table */}
+       <div className="page-card">
+         <div className="card-header">
+@@ -216,7 +315,7 @@ const MilkEntry = () => {
+           </Link>
+         </div>
+         <MilkEntryTable
+-          entries={entries}
++          entries={processedEntries}
+           handleDelete={handleDelete}
+           isDeleting={deleteMutation.isPending}
+         />
+@@ -247,4 +346,4 @@ const MilkEntry = () => {
+   );
+ };
+ 
+-export default MilkEntry;
++export default MilkEntry;
+\ No newline at end of file
+diff --git a/frontend/src/pages/admin/Orders.jsx b/frontend/src/pages/admin/Orders.jsx
+index d2aef54..b6a77e7 100644
+--- a/frontend/src/pages/admin/Orders.jsx
++++ b/frontend/src/pages/admin/Orders.jsx
+@@ -6,6 +6,7 @@ import './AdminPages.css';
+ import PageHeader from '../../components/PageHeader';
+ import Button from '../../components/Button';
+ import DataTable from '../../components/DataTable';
++import Modal from '../../components/Modal';
+ 
+ const AdminOrders = () => {
+   const [orders, setOrders] = useState([]);
+@@ -18,6 +19,11 @@ const AdminOrders = () => {
+     cancelled: 0
+   });
+ 
++  // Modal deletion states
++  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
++  const [orderToDelete, setOrderToDelete] = useState(null);
++  const [deletingId, setDeletingId] = useState(null);
++
+   useEffect(() => {
+     fetchData();
+   }, []);
+@@ -65,18 +71,38 @@ const AdminOrders = () => {
+     }
+   };
+ 
+-  const handleDelete = async (id) => {
++  const handleDeleteClick = (id) => {
+     if (!id) {
+       console.error('Invalid order ID');
+       return;
+     }
+-    if (window.confirm('Delete this order?')) {
+-      try {
+-        await orderService.delete(id);
+-        setOrders(prev => prev.filter(o => o._id !== id));
+-      } catch (error) {
+-        console.error('Error deleting order:', error);
++    setOrderToDelete(id);
++    setDeleteModalOpen(true);
++  };
++
++  const confirmDelete = async () => {
++    if (!orderToDelete) return;
++    try {
++      setDeletingId(orderToDelete);
++      await orderService.delete(orderToDelete);
++      setOrders(prev => prev.filter(o => o._id !== orderToDelete));
++      
++      // Update stats dynamically on successful deletion
++      const deletedOrder = orders.find(o => o._id === orderToDelete);
++      if (deletedOrder) {
++        const status = deletedOrder.status || 'pending';
++        setStats(prev => ({
++          ...prev,
++          [status]: Math.max(0, prev[status] - 1)
++        }));
+       }
++      
++      setDeleteModalOpen(false);
++      setOrderToDelete(null);
++    } catch (error) {
++      console.error('Error deleting order:', error);
++    } finally {
++      setDeletingId(null);
+     }
+   };
+ 
+@@ -294,7 +320,7 @@ const AdminOrders = () => {
+                     </>
+                   )}
+                   <motion.button
+-                    onClick={() => handleDelete(row._id)}
++                    onClick={() => handleDeleteClick(row._id)}
+                     className="btn-delete"
+                     whileHover={{ scale: 1.05 }}
+                     whileTap={{ scale: 0.95 }}
+@@ -308,6 +334,22 @@ const AdminOrders = () => {
+           ]}
+         />
+       </motion.div>
++
++      {/* Delete Confirmation Modal */}
++      <Modal
++        isOpen={deleteModalOpen}
++        onClose={() => {
++          setDeleteModalOpen(false);
++          setOrderToDelete(null);
++        }}
++        onConfirm={confirmDelete}
++        title="Delete Order"
++        message="Are you sure you want to delete this order? This action cannot be undone and will also automatically delete the corresponding milk delivery record in the customer's delivery history."
++        confirmText={deletingId ? "Deleting..." : "Delete Order"}
++        cancelText="Cancel"
++        type="danger"
++        confirmDisabled={Boolean(deletingId)}
++      />
+     </div>
+   );
+ };
+diff --git a/frontend/src/pages/customer/CustomerDashboard.jsx b/frontend/src/pages/customer/CustomerDashboard.jsx
+deleted file mode 100644
+index c820714..0000000
+--- a/frontend/src/pages/customer/CustomerDashboard.jsx
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import React, { useState } from 'react';
+-import { useQuery } from '@tanstack/react-query';
+-import { milkService } from '../../services/api';
+-import PageHeader from '../../components/PageHeader';
+-import Button from '../../components/Button';
+-import DataTable from '../../components/DataTable';
+-import '../../pages/admin/AdminPages.css';
+-
+-const CustomerDashboard = () => {
+-  const [month, setMonth] = useState(
+-    new Date().toISOString().slice(0, 7) // YYYY-MM
+-  );
+-
+-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+-
+-  const { data, isLoading, isError } = useQuery({
+-    queryKey: ['customer-milk', month],
+-    queryFn: () =>
+-      milkService.getByUserAndMonth(user._id, month),
+-  });
+-
+-  if (isLoading) return <div>Loading...</div>;
+-  if (isError) return <div>Error loading data</div>;
+-
+-  const entries = data?.data?.entries || [];
+-  const totals = data?.data?.totals || {};
+-
+-  return (
+-    <div className="admin-page">
+-      <PageHeader
+-        title="My Milk Dashboard"
+-        subtitle="Monthly summary & billing"
+-      />
+-
+-      {/* MONTH SELECT */}
+-      <div style={{ marginBottom: 20 }}>
+-        <input
+-          type="month"
+-          value={month}
+-          onChange={(e) => setMonth(e.target.value)}
+-        />
+-      </div>
+-
+-      {/* STATS */}
+-      <div className="stats-grid">
+-        <div className="ds-stat-card">
+-          <div className="stat-label">Total Milk</div>
+-          <div className="stat-value">
+-            {totals.totalLitres || 0} L
+-          </div>
+-        </div>
+-
+-        <div className="ds-stat-card">
+-          <div className="stat-label">Total Amount</div>
+-          <div className="stat-value">
+-            ₹{totals.totalPrice || 0}
+-          </div>
+-        </div>
+-      </div>
+-
+-      {/* DOWNLOAD PDF */}
+-      <Button
+-        variant="primary"
+-        onClick={() =>
+-          window.open(`/api/pdf/my-report?month=${month}`, '_blank')
+-        }
+-      >
+-        Download Report
+-      </Button>
+-
+-      {/* TABLE */}
+-      <div className="page-card" style={{ marginTop: 20 }}>
+-        <h3>Daily Entries</h3>
+-
+-        {entries.length === 0 ? (
+-          <div>No entries found</div>
+-        ) : (
+-          <DataTable
+-            columns={[
+-              { label: 'Date', render: (val, row) => new Date(row.date).toLocaleDateString() },
+-              { label: 'Qty', render: (val, row) => `${row.quantity} L` },
+-              { label: 'Price', render: (val, row) => `₹${row.pricePerLitre}` },
+-              { label: 'Total', render: (val, row) => `₹${row.totalPrice}` },
+-              { label: 'Session', key: 'session' },
+-            ]}
+-            data={entries}
+-          />
+-        )}
+-      </div>
+-    </div>
+-  );
+-};
+-
+-export default CustomerDashboard;
+\ No newline at end of file
+diff --git a/frontend/src/pages/customer/Dashboard.jsx b/frontend/src/pages/customer/Dashboard.jsx
+index f0fa7e6..99a4c7c 100644
+--- a/frontend/src/pages/customer/Dashboard.jsx
++++ b/frontend/src/pages/customer/Dashboard.jsx
+@@ -1,9 +1,9 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import { Link } from 'react-router-dom';
+ import { motion } from 'framer-motion';
+-import { useQuery } from '@tanstack/react-query';
++import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+ import { useAuth } from '../../context/AuthContext';
+-import { milkService, orderService, paymentService } from '../../services/api';
++import { milkService, orderService, paymentService, subscriptionService } from '../../services/api';
+ import { extractListFromResponse } from '../../lib/apiNormalize';
+ import { milkEntriesFromResponse } from '../../lib/milkResponse';
+ import { milkLineRate, milkLineAmount } from '../../lib/milkEntryDisplay';
+@@ -11,15 +11,25 @@ import { isoMonthPrefix } from '../../lib/dates';
+ import { amountPending } from '../../lib/paymentUtils';
+ import { PageLoading, PageError } from '../../components/PageState';
+ import DataTable from '../../components/DataTable';
++import Button from '../../components/Button';
+ import './CustomerPages.css';
+ import PageHeader from '../../components/PageHeader';
+ 
+ const customerDashKey = ['customer', 'dashboard'];
++const subscriptionQueryKey = ['customer', 'subscription'];
+ 
+ const CustomerDashboard = () => {
+   const { user } = useAuth();
++  const queryClient = useQueryClient();
+ 
+-  const query = useQuery({
++  const [quantity, setQuantity] = useState(1);
++  const [timeSlot, setTimeSlot] = useState('morning');
++  const [frequency, setFrequency] = useState('daily');
++  const [editingSub, setEditingSub] = useState(false);
++  const [statusMsg, setStatusMsg] = useState(null);
++
++  // Fetch dashboard stats
++  const dashboardQuery = useQuery({
+     queryKey: customerDashKey,
+     queryFn: async () => {
+       const [milkRes, ordersRes, paymentsRes] = await Promise.all([
+@@ -54,7 +64,63 @@ const CustomerDashboard = () => {
+     },
+   });
+ 
+-  if (query.isPending) {
++  // Fetch subscription defaults
++  const subscriptionQuery = useQuery({
++    queryKey: subscriptionQueryKey,
++    queryFn: async () => {
++      const response = await subscriptionService.getMy();
++      const sub = response.data;
++      if (sub) {
++        setQuantity(sub.quantity);
++        setTimeSlot(sub.timeSlot);
++        setFrequency(sub.frequency);
++      }
++      return sub;
++    }
++  });
++
++  // Mutation to toggle vacation mode
++  const toggleVacationMutation = useMutation({
++    mutationFn: (isActive) => subscriptionService.toggleVacation(isActive),
++    onSuccess: (data) => {
++      queryClient.setQueryData(subscriptionQueryKey, data.data.subscription);
++      setStatusMsg({
++        type: 'success',
++        text: data.data.message
++      });
++      setTimeout(() => setStatusMsg(null), 4000);
++    }
++  });
++
++  // Mutation to save subscription changes
++  const saveSubMutation = useMutation({
++    mutationFn: (payload) => subscriptionService.update(payload),
++    onSuccess: (data) => {
++      queryClient.setQueryData(subscriptionQueryKey, data.data.subscription);
++      setEditingSub(false);
++      setStatusMsg({
++        type: 'success',
++        text: 'Delivery subscription plan updated successfully!'
++      });
++      setTimeout(() => setStatusMsg(null), 4000);
++    }
++  });
++
++  const handleToggleVacation = () => {
++    const isCurrentlyActive = subscriptionQuery.data?.isActive ?? true;
++    toggleVacationMutation.mutate(!isCurrentlyActive);
++  };
++
++  const handleSaveSubscription = (e) => {
++    e.preventDefault();
++    saveSubMutation.mutate({
++      quantity,
++      timeSlot,
++      frequency
++    });
++  };
++
++  if (dashboardQuery.isPending || subscriptionQuery.isPending) {
+     return (
+       <div className="customer-loading customer-loading--padded">
+         <PageLoading label="Loading your dashboard…" />
+@@ -62,15 +128,16 @@ const CustomerDashboard = () => {
+     );
+   }
+ 
+-  if (query.isError) {
++  if (dashboardQuery.isError) {
+     return (
+       <div className="customer-loading customer-loading--padded">
+-        <PageError title="Could not load dashboard" onRetry={() => query.refetch()} />
++        <PageError title="Could not load dashboard" onRetry={() => dashboardQuery.refetch()} />
+       </div>
+     );
+   }
+ 
+-  const { stats, recentMilk } = query.data;
++  const { stats, recentMilk } = dashboardQuery.data;
++  const isVacationMode = !(subscriptionQuery.data?.isActive ?? true);
+ 
+   const containerVariants = {
+     hidden: { opacity: 0 },
+@@ -88,9 +155,113 @@ const CustomerDashboard = () => {
+       variants={containerVariants}
+       initial="hidden"
+       animate="visible"
++      style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}
+     >
+       <PageHeader title={`Welcome, ${user?.username || ''}`} subtitle="Your milk and billing snapshot" />
+ 
++      {/* VACATION MODE & SUBSCRIPTION PLAN CARD */}
++      <motion.section variants={itemVariants} className="page-card" style={{ padding: '24px', border: isVacationMode ? '1px solid #fca5a5' : '1px solid rgba(76,175,80,0.15)', background: isVacationMode ? 'rgba(239, 68, 68, 0.02)' : 'rgba(76, 175, 80, 0.01)' }}>
++        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
++          <div>
++            <h3 style={{ margin: 0, fontSize: '1.25rem', color: isVacationMode ? '#dc2626' : '#2d5f3f', display: 'flex', alignItems: 'center', gap: '8px' }}>
++              <span>{isVacationMode ? '🌴' : '📅'}</span> 
++              <span>{isVacationMode ? 'Vacation Mode Active' : 'Daily Delivery Subscription'}</span>
++            </h3>
++            <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: 'var(--ds-text-muted)', lineHeight: '1.5' }}>
++              {isVacationMode 
++                ? 'Your daily morning/evening milk subscription deliveries are temporarily suspended. We hope you have a great holiday!' 
++                : `Active plan: ${subscriptionQuery.data?.quantity || 1}L delivered ${subscriptionQuery.data?.frequency || 'daily'} during ${subscriptionQuery.data?.timeSlot === 'morning' ? 'Morning 🌅' : 'Evening 🌆'} slot.`
++              }
++            </p>
++          </div>
++          
++          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
++            <Button
++              variant={isVacationMode ? 'primary' : 'secondary'}
++              onClick={handleToggleVacation}
++              disabled={toggleVacationMutation.isPending}
++              style={{ background: isVacationMode ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none' }}
++            >
++              {isVacationMode ? '☀️ Resume Deliveries' : '🌴 Pause Deliveries (Vacation)'}
++            </Button>
++            
++            {!isVacationMode && (
++              <Button
++                variant="secondary"
++                onClick={() => setEditingSub(!editingSub)}
++              >
++                {editingSub ? '✕ Close' : '⚙️ Edit Plan'}
++              </Button>
++            )}
++          </div>
++        </div>
++
++        {/* Edit Subscription Panel */}
++        {editingSub && !isVacationMode && (
++          <motion.form 
++            onSubmit={handleSaveSubscription}
++            initial={{ opacity: 0, height: 0 }}
++            animate={{ opacity: 1, height: 'auto' }}
++            style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--ds-border)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '16px', alignItems: 'flex-end' }}
++          >
++            <div className="form-group-custom">
++              <label className="form-label-custom" style={{ fontSize: '0.8rem' }}>Default Quantity (Liters)</label>
++              <input 
++                type="number" 
++                step="0.25" 
++                className="form-input-custom"
++                value={quantity}
++                onChange={(e) => setQuantity(Number(e.target.value))}
++                min="0.25" 
++                max="50"
++                required
++              />
++            </div>
++
++            <div className="form-group-custom">
++              <label className="form-label-custom" style={{ fontSize: '0.8rem' }}>Time Slot</label>
++              <select 
++                className="form-select-custom"
++                value={timeSlot}
++                onChange={(e) => setTimeSlot(e.target.value)}
++              >
++                <option value="morning">Morning (6 AM - 9 AM)</option>
++                <option value="evening">Evening (4 PM - 7 PM)</option>
++              </select>
++            </div>
++
++            <div className="form-group-custom">
++              <label className="form-label-custom" style={{ fontSize: '0.8rem' }}>Frequency</label>
++              <select 
++                className="form-select-custom"
++                value={frequency}
++                onChange={(e) => setFrequency(e.target.value)}
++              >
++                <option value="daily">Daily drops</option>
++                <option value="alternate">Alternate days</option>
++                <option value="weekly">Weekly (Sundays only)</option>
++              </select>
++            </div>
++
++            <Button
++              type="submit"
++              variant="primary"
++              disabled={saveSubMutation.isPending}
++              style={{ height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
++            >
++              {saveSubMutation.isPending ? 'Saving...' : 'Save Plan'}
++            </Button>
++          </motion.form>
++        )}
++
++        {statusMsg && (
++          <div className={`alert ${statusMsg.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginTop: '16px', marginBottom: 0 }}>
++            {statusMsg.text}
++          </div>
++        )}
++      </motion.section>
++
++      {/* Stats Cards Grid */}
+       <motion.div className="stats-grid" variants={containerVariants} initial="hidden" animate="visible">
+         <motion.div variants={itemVariants} className="ds-stat-card">
+           <div className="stat-icon">🥛</div>
+@@ -144,6 +315,7 @@ const CustomerDashboard = () => {
+         </motion.div>
+       </motion.div>
+ 
++      {/* Recent Milk History */}
+       <motion.div variants={itemVariants} className="recent-milk-card">
+         <div className="card-header">
+           <h3 className="card-title">Recent milk</h3>
+@@ -163,8 +335,8 @@ const CustomerDashboard = () => {
+               className: 'date-cell',
+               render: (value) => (value ? new Date(value).toLocaleDateString('en-IN') : '—'),
+             },
+-            { label: 'Qty', key: 'quantity', className: 'qty-cell', render: (value) => `${Number(value).toFixed(2)} L` },
+             { label: 'Session', key: 'session', render: (value) => value || '—' },
++            { label: 'Qty', key: 'quantity', className: 'qty-cell', render: (value) => `${Number(value).toFixed(2)} L` },
+             { label: 'Rate/L', className: 'rate-cell', render: (_, row) => `₹${milkLineRate(row).toFixed(2)}` },
+             { label: 'Amount', className: 'amount-cell', render: (_, row) => `₹${milkLineAmount(row).toFixed(2)}` },
+           ]}
+@@ -174,4 +346,4 @@ const CustomerDashboard = () => {
+   );
+ };
+ 
+-export default CustomerDashboard;
++export default CustomerDashboard;
+\ No newline at end of file
+diff --git a/frontend/src/pages/customer/MilkView.jsx b/frontend/src/pages/customer/MilkView.jsx
+index f8abca1..c02ff89 100644
+--- a/frontend/src/pages/customer/MilkView.jsx
++++ b/frontend/src/pages/customer/MilkView.jsx
+@@ -6,6 +6,7 @@ import { milkEntriesFromResponse, filterMilkEntriesByPreset } from '../../lib/mi
+ import { milkLineRate, milkLineAmount } from '../../lib/milkEntryDisplay';
+ import { PageLoading, PageError } from '../../components/PageState';
+ import DataTable from '../../components/DataTable';
++import EntryTypeBadge from '../../components/EntryTypeBadge';
+ import './CustomerPages.css';
+ import PageHeader from '../../components/PageHeader';
+ 
+@@ -14,6 +15,8 @@ const NO_MILK = [];
+ 
+ const MilkView = () => {
+   const [filter, setFilter] = useState('all');
++  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'normal' | 'order'
++  const [sortOrder, setSortOrder] = useState('none'); // 'none' | 'normal' | 'order'
+ 
+   const query = useQuery({
+     queryKey: customerMilkKey,
+@@ -22,11 +25,40 @@ const MilkView = () => {
+ 
+   const { filteredEntries, volumeL, amountInr } = useMemo(() => {
+     const milkEntries = query.data == null ? NO_MILK : query.data;
+-    const filtered = filterMilkEntriesByPreset(milkEntries, filter);
++    
++    // 1. Filter by date presets
++    let filtered = filterMilkEntriesByPreset(milkEntries, filter);
++    
++    // 2. Filter by entry type
++    if (typeFilter === 'normal') {
++      filtered = filtered.filter(m => !m.entryType || m.entryType.toUpperCase() === 'NORMAL');
++    } else if (typeFilter === 'order') {
++      filtered = filtered.filter(m => m.entryType && m.entryType.toUpperCase() === 'ORDER');
++    }
++    
++    // 3. Sort by entry type
++    if (sortOrder === 'normal') {
++      filtered = [...filtered].sort((a, b) => {
++        const typeA = (a.entryType || 'NORMAL').toUpperCase();
++        const typeB = (b.entryType || 'NORMAL').toUpperCase();
++        if (typeA === 'NORMAL' && typeB === 'ORDER') return -1;
++        if (typeA === 'ORDER' && typeB === 'NORMAL') return 1;
++        return 0;
++      });
++    } else if (sortOrder === 'order') {
++      filtered = [...filtered].sort((a, b) => {
++        const typeA = (a.entryType || 'NORMAL').toUpperCase();
++        const typeB = (b.entryType || 'NORMAL').toUpperCase();
++        if (typeA === 'ORDER' && typeB === 'NORMAL') return -1;
++        if (typeA === 'NORMAL' && typeB === 'ORDER') return 1;
++        return 0;
++      });
++    }
++
+     const vol = filtered.reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
+     const amt = filtered.reduce((sum, m) => sum + milkLineAmount(m), 0);
+     return { filteredEntries: filtered, volumeL: vol, amountInr: amt };
+-  }, [query.data, filter]);
++  }, [query.data, filter, typeFilter, sortOrder]);
+ 
+   if (query.isPending) {
+     return (
+@@ -58,17 +90,47 @@ const MilkView = () => {
+     <motion.div className="customer-page" variants={containerVariants} initial="hidden" animate="visible">
+       <PageHeader title="My milk records" subtitle="Filter by period and review quantities" />
+ 
+-      <motion.div className="filter-bar" variants={itemVariants}>
+-        {['all', 'today', 'week', 'month'].map((key) => (
+-          <button
+-            key={key}
+-            type="button"
+-            className={`filter-btn ${filter === key ? 'active' : ''}`}
+-            onClick={() => setFilter(key)}
++      <motion.div className="filter-bar" variants={itemVariants} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '24px' }}>
++        <div style={{ display: 'flex', gap: '8px' }}>
++          {['all', 'today', 'week', 'month'].map((key) => (
++            <button
++              key={key}
++              type="button"
++              className={`filter-btn ${filter === key ? 'active' : ''}`}
++              onClick={() => setFilter(key)}
++            >
++              {key === 'all' ? 'All' : key === 'today' ? 'Today' : key === 'week' ? '7 days' : 'Month'}
++            </button>
++          ))}
++        </div>
++
++        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
++          <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Type:</label>
++          <select
++            value={typeFilter}
++            onChange={(e) => setTypeFilter(e.target.value)}
++            className="filter-select"
++            style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '120px' }}
+           >
+-            {key === 'all' ? 'All' : key === 'today' ? 'Today' : key === 'week' ? '7 days' : 'Month'}
+-          </button>
+-        ))}
++            <option value="all">All</option>
++            <option value="normal">Normal Only</option>
++            <option value="order">Ordered Only</option>
++          </select>
++        </div>
++
++        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
++          <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sort:</label>
++          <select
++            value={sortOrder}
++            onChange={(e) => setSortOrder(e.target.value)}
++            className="filter-select"
++            style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '140px' }}
++          >
++            <option value="none">Default (Date)</option>
++            <option value="normal">Normal First</option>
++            <option value="order">Ordered First</option>
++          </select>
++        </div>
+       </motion.div>
+ 
+       <motion.div className="stats-grid" variants={containerVariants}>
+@@ -107,6 +169,11 @@ const MilkView = () => {
+             { label: 'Qty', key: 'quantity', render: (value) => `${Number(value).toFixed(2)} L` },
+             { label: 'Rate', className: 'rate-cell', render: (_, row) => `₹${milkLineRate(row).toFixed(2)}` },
+             { label: 'Amount', className: 'amount-cell', render: (_, row) => `₹${milkLineAmount(row).toFixed(2)}` },
++            {
++              label: 'Type',
++              key: 'entryType',
++              render: (value) => <EntryTypeBadge type={value || 'NORMAL'} />,
++            },
+           ]}
+         />
+       </motion.div>
+@@ -114,4 +181,4 @@ const MilkView = () => {
+   );
+ };
+ 
+-export default MilkView;
++export default MilkView;
+\ No newline at end of file
+diff --git a/frontend/src/pages/customer/Payments.jsx b/frontend/src/pages/customer/Payments.jsx
+index 9aac387..9a166d7 100644
+--- a/frontend/src/pages/customer/Payments.jsx
++++ b/frontend/src/pages/customer/Payments.jsx
+@@ -24,10 +24,10 @@ const CustomerPayments = () => {
+   const milkQuery = useQuery({
+     queryKey: ['customer-milk', selectedMonth],
+     queryFn: async () => {
+-      const response = await milkService.getByUserAndMonth(user._id, selectedMonth);
++      const response = await milkService.getByUserAndMonth(user.id, selectedMonth);
+       return response.data;
+     },
+-    enabled: !!user?._id && !!selectedMonth,
++    enabled: !!user?.id && !!selectedMonth,
+   });
+ 
+   const handleMonthChange = (e) => {
+diff --git a/frontend/src/services/api.js b/frontend/src/services/api.js
+index 4026762..ced5570 100644
+--- a/frontend/src/services/api.js
++++ b/frontend/src/services/api.js
+@@ -167,4 +167,15 @@ export const pdfService = {
+   },
+ };
+ 
++export const notificationService = {
++  broadcast: (data) => api.post('/api/notifications/broadcast', data),
++};
++
++export const subscriptionService = {
++  getMy: () => api.get('/api/subscriptions/my'),
++  update: (data) => api.put('/api/subscriptions/my', data),
++  toggleVacation: (isActive) => api.post('/api/subscriptions/my/vacation', { isActive }),
++  getAll: () => api.get('/api/subscriptions'),
++};
++
+ export default api;
+\ No newline at end of file
+diff --git a/frontend/vercel.json b/frontend/vercel.json
+new file mode 100644
+index 0000000..29c0269
+--- /dev/null
++++ b/frontend/vercel.json
+@@ -0,0 +1,8 @@
++{
++  "rewrites": [
++    {
++      "source": "/(.*)",
++      "destination": "/index.html"
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/raithupalu_optimization.patch b/raithupalu_optimization.patch
+new file mode 100644
+index 0000000..f17554d

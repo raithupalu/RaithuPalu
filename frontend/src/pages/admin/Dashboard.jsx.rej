@@ -1,0 +1,435 @@
+diff a/frontend/src/pages/admin/Dashboard.jsx b/frontend/src/pages/admin/Dashboard.jsx	(rejected hunks)
+@@ -1,11 +1,12 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import { motion } from 'framer-motion';
+ import { useAdminDashboard } from '../../hooks/useAdminDashboard';
+ import { PageError } from '../../components/PageState';
+ import { DashboardSkeleton } from '../../components/Skeleton';
+ import DataTable from '../../components/DataTable';
+-import './AdminPages.css';
+ import PageHeader from '../../components/PageHeader';
++import { forecastNextWeek, predictCustomerChurn, detectAnomalies, forecastRevenue } from '../../lib/aiEngine';
++import './AdminPages.css';
+ 
+ const containerVariants = {
+   hidden: { opacity: 0 },
+@@ -22,6 +23,7 @@ const itemVariants = {
+ 
+ const AdminDashboard = () => {
+   const { data, isPending, isError, error, refetch } = useAdminDashboard();
++  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ai'
+ 
+   if (isPending) {
+     return <DashboardSkeleton />;
+@@ -39,100 +41,326 @@ const AdminDashboard = () => {
+     );
+   }
+ 
+-  const { stats, recentOrders } = data;
++  const { stats, recentOrders, rawData } = data;
++  const { users, milk, payments } = rawData;
++
++  // Run AI / Statistical models
++  const productionModel = forecastNextWeek(milk);
++  const churnAnalysis = predictCustomerChurn(users, milk);
++  const anomalies = detectAnomalies(milk);
++  const revenueModel = forecastRevenue(payments);
+ 
+   return (
+     <div className="admin-page">
+-      <PageHeader title="Dashboard" subtitle="Operations overview — data refreshes when you revisit this page" />
+-
+-      <motion.section
+-        className="stats-grid stats-grid--dashboard"
+-        variants={containerVariants}
+-        initial="hidden"
+-        animate="visible"
+-        aria-label="Key metrics"
+-      >
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>👥</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Customers</p>
+-            <h2 className="stat-value">{stats.totalCustomers}</h2>
+-          </div>
+-          <div className="stat-accent-line" />
+-        </motion.div>
++      <PageHeader 
++        title="Admin Portal" 
++        subtitle="Operations overview & AI-powered business predictions" 
++      />
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>🥛</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Today&apos;s milk</p>
+-            <h2 className="stat-value">{stats.todayMilk} L</h2>
+-          </div>
+-          <div className="stat-accent-line" />
+-        </motion.div>
++      {/* PORTAL TABS */}
++      <div className="tabs-container" style={{ marginBottom: '32px' }}>
++        <button
++          type="button"
++          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
++          onClick={() => setActiveTab('overview')}
++        >
++          📊 Operations Overview
++        </button>
++        <button
++          type="button"
++          className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}
++          onClick={() => setActiveTab('ai')}
++          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
++        >
++          ✨ MilkFlow AI™ Predictor
++        </button>
++      </div>
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>💰</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Collected this month</p>
+-            <h2 className="stat-value">₹{Number(stats.monthlyRevenue).toLocaleString('en-IN')}</h2>
+-          </div>
+-          <div className="stat-accent-line" />
+-        </motion.div>
++      {activeTab === 'overview' ? (
++        <motion.div
++          variants={containerVariants}
++          initial="hidden"
++          animate="visible"
++        >
++          {/* Key Metrics */}
++          <section
++            className="stats-grid stats-grid--dashboard"
++            aria-label="Key metrics"
++          >
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>👥</div>
++              <div className="stat-content">
++                <p className="stat-label">Customers</p>
++                <h2 className="stat-value">{stats.totalCustomers}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>📦</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Pending orders</p>
+-            <h2 className="stat-value">{stats.pendingOrders}</h2>
+-          </div>
+-          <div className="stat-accent-line" />
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>🥛</div>
++              <div className="stat-content">
++                <p className="stat-label">Today&apos;s milk</p>
++                <h2 className="stat-value">{stats.todayMilk} L</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>💰</div>
++              <div className="stat-content">
++                <p className="stat-label">Collected this month</p>
++                <h2 className="stat-value">₹{Number(stats.monthlyRevenue).toLocaleString('en-IN')}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>📦</div>
++              <div className="stat-content">
++                <p className="stat-label">Pending orders</p>
++                <h2 className="stat-value">{stats.pendingOrders}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon" aria-hidden>📋</div>
++              <div className="stat-content">
++                <p className="stat-label">Total expenses</p>
++                <h2 className="stat-value">₹{Number(stats.totalExpenses).toLocaleString('en-IN')}</h2>
++              </div>
++              <div className="stat-accent-line" />
++            </motion.div>
++          </section>
++
++          {/* Recent Orders Table */}
++          <motion.section
++            className="premium-card dashboard-orders-card"
++            initial={{ opacity: 0, y: 20 }}
++            animate={{ opacity: 1, y: 0 }}
++            transition={{ delay: 0.15, duration: 0.45 }}
++            aria-labelledby="recent-orders-heading"
++          >
++            <div className="table-header">
++              <h2 id="recent-orders-heading" className="table-title" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ds-text)', fontFamily: 'Space Grotesk' }}>
++                Recent orders
++              </h2>
++            </div>
++
++            <DataTable
++              data={recentOrders}
++              emptyMessage="No orders yet"
++              animate={false}
++              columns={[
++                { label: 'ID', key: 'orderId', className: 'order-id', render: (_, row) => row._id?.slice(-8) || '—' },
++                { label: 'Customer', key: 'customer', className: 'customer-name', render: (_, row) => row.userId?.username || '—' },
++                { label: 'Qty', key: 'quantity', className: 'amount', render: (_, row) => row.quantity ?? '—' },
++                {
++                  label: 'Status',
++                  render: (_, row) => (
++                    <span className={`status-badge status-${row.status || 'pending'}`}>
++                      {row.status || 'pending'}
++                    </span>
++                  ),
++                },
++                { label: 'Date', key: 'createdAt', className: 'date', render: (_, row) => (row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-IN') : '—') },
++              ]}
++            />
++          </motion.section>
+         </motion.div>
++      ) : (
++        <motion.div
++          variants={containerVariants}
++          initial="hidden"
++          animate="visible"
++          style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
++        >
++          {/* AI Header & Overview Card */}
++          <motion.section variants={itemVariants} className="page-card" style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(76,175,80,0.04), rgba(45,95,63,0.06))', border: '1px solid rgba(76,175,80,0.2)' }}>
++            <h3 style={{ fontSize: '1.5rem', color: '#2d5f3f', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
++              <span>🔮</span> MilkFlow AI™ Smart Assistant
++            </h3>
++            <p style={{ margin: 0, color: 'var(--ds-text-muted)', fontSize: '0.95rem', lineHeight: '1.6' }}>
++              Predictive models have analyzed <strong>{milk.length}</strong> milk delivery entries, <strong>{users.length}</strong> user records, and <strong>{payments.length}</strong> billing profiles. 
++              The statistics below are calculated dynamically using linear regression, time-series, and activity-drop heuristics.
++            </p>
++          </motion.section>
++
++          {/* AI Forecasting Stats Row */}
++          <section className="stats-grid">
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon">📈</div>
++              <div className="stat-content">
++                <p className="stat-label">Predicted next month revenue</p>
++                <h2 className="stat-value">₹{revenueModel.predictedNextMonth.toLocaleString('en-IN')}</h2>
++              </div>
++              <div style={{ fontSize: '0.85rem', marginTop: '8px', color: revenueModel.deltaPercentage >= 0 ? '#16a34a' : '#ef4444', fontWeight: 'bold' }}>
++                {revenueModel.deltaPercentage >= 0 ? '▲' : '▼'} {Math.abs(revenueModel.deltaPercentage).toFixed(1)}% vs this month
++              </div>
++            </motion.div>
++
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon">🐄</div>
++              <div className="stat-content">
++                <p className="stat-label">Estimated daily average yield</p>
++                <h2 className="stat-value">{productionModel.avgDailyQty} L</h2>
++              </div>
++              <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++                Production Trend: <span style={{ textTransform: 'capitalize', fontWeight: 'bold', color: productionModel.trend === 'increasing' ? '#16a34a' : productionModel.trend === 'declining' ? '#ef4444' : '#2563eb' }}>{productionModel.trend}</span>
++              </div>
++            </motion.div>
+ 
+-        <motion.div variants={itemVariants} className="ds-stat-card">
+-          <div className="stat-icon" aria-hidden>📋</div>
+-          <div className="stat-content">
+-            <p className="stat-label">Total expenses</p>
+-            <h2 className="stat-value">₹{Number(stats.totalExpenses).toLocaleString('en-IN')}</h2>
++            <motion.div variants={itemVariants} className="ds-stat-card">
++              <div className="stat-icon">⚠️</div>
++              <div className="stat-content">
++                <p className="stat-label">Active churn warnings</p>
++                <h2 className="stat-value" style={{ color: churnAnalysis.length > 0 ? '#dc2626' : 'var(--ds-text)' }}>{churnAnalysis.length}</h2>
++              </div>
++              <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--ds-text-muted)' }}>
++                {churnAnalysis.filter(c => c.riskLevel === 'high').length} High-Risk Clients
++              </div>
++            </motion.div>
++          </section>
++
++          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }} className="buffalo-details-grid">
++            {/* column 1: production forecasting */}
++            <motion.div variants={itemVariants} className="page-card" style={{ padding: '24px' }}>
++              <div className="card-header" style={{ marginBottom: '16px' }}>
++                <h4 className="card-title" style={{ fontSize: '1.15rem' }}>🎯 7-Day Production Forecast</h4>
++                <span className="status-badge" style={{
++                  background: productionModel.confidence === 'high' ? '#dcfce7' : productionModel.confidence === 'medium' ? '#fef3c7' : '#fee2e2',
++                  color: productionModel.confidence === 'high' ? '#16a34a' : productionModel.confidence === 'medium' ? '#d97706' : '#ef4444',
++                }}>
++                  {productionModel.confidence} confidence
++                </span>
++              </div>
++              
++              {productionModel.forecast.length === 0 ? (
++                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--ds-text-muted)' }}>
++                  Not enough historical entries to generate a forecast. Keep recording daily milk collection.
++                </div>
++              ) : (
++                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
++                  {productionModel.forecast.map((f, i) => (
++                    <div key={f.date} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
++                      <span style={{ width: '80px', fontWeight: '600', color: 'var(--ds-text)', fontSize: '0.9rem' }}>{f.date}</span>
++                      
++                      {/* Custom styled progress bar showing predicted relative size */}
++                      <div style={{ flex: 1, height: '12px', background: 'var(--ds-surface-muted)', borderRadius: '6px', overflow: 'hidden' }}>
++                        <motion.div 
++                          initial={{ width: 0 }}
++                          animate={{ width: `${Math.min((f.predictedQty / (productionModel.avgDailyQty || 1)) * 50, 100)}%` }}
++                          transition={{ delay: i * 0.05, duration: 0.5 }}
++                          style={{ height: '100%', background: 'linear-gradient(90deg, #4caf50, #2563eb)', borderRadius: '6px' }}
++                        />
++                      </div>
++                      
++                      <span style={{ width: '60px', textAlign: 'right', fontWeight: 'bold', color: '#2d5f3f', fontSize: '0.9rem' }}>{f.predictedQty} L</span>
++                    </div>
++                  ))}
++                </div>
++              )}
++            </motion.div>
++
++            {/* column 2: churn alerts & anomalies */}
++            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
++              {/* Churn warnings card */}
++              <motion.div variants={itemVariants} className="page-card" style={{ padding: '24px' }}>
++                <h4 className="card-title" style={{ fontSize: '1.15rem', marginBottom: '16px' }}>🛡️ Customer Retention Alerts</h4>
++                
++                {churnAnalysis.length === 0 ? (
++                  <div style={{ padding: '16px', textAlign: 'center', color: '#16a34a', fontWeight: 'bold', background: '#dcfce7', borderRadius: '10px' }}>
++                    ✅ Great news! All customers are actively receiving deliveries.
++                  </div>
++                ) : (
++                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
++                    {churnAnalysis.map((item) => (
++                      <div 
++                        key={item.customer._id} 
++                        style={{ 
++                          padding: '12px', 
++                          border: `1px solid ${item.riskLevel === 'high' ? '#fca5a5' : '#fde047'}`, 
++                          background: item.riskLevel === 'high' ? '#fee2e2' : '#fef9c3',
++                          borderRadius: '10px'
++                        }}
++                      >
++                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
++                          <strong style={{ color: '#111827', fontSize: '0.9rem' }}>@{item.customer.username}</strong>
++                          <span style={{ 
++                            fontSize: '10px', 
++                            fontWeight: 'bold', 
++                            padding: '2px 8px', 
++                            borderRadius: '4px', 
++                            textTransform: 'uppercase',
++                            background: item.riskLevel === 'high' ? '#dc2626' : '#d97706',
++                            color: 'white'
++                          }}>
++                            {item.riskLevel} risk
++                          </span>
++                        </div>
++                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#374151', lineHeight: '1.4' }}>
++                          {item.reason} {item.lastActiveDate && `Last delivery: ${item.lastActiveDate}.`}
++                        </p>
++                        <div style={{ marginTop: '8px', display: 'flex', gap: '10px' }}>
++                          <a 
++                            href={`https://wa.me/91${item.customer.phone}`} 
++                            target="_blank" 
++                            rel="noopener noreferrer"
++                            style={{ fontSize: '11px', textDecoration: 'none', background: '#16a34a', color: 'white', padding: '4px 10px', borderRadius: '4px', fontWeight: 'bold' }}
++                          >
++                            💬 Chat WhatsApp
++                          </a>
++                          <a 
++                            href={`tel:${item.customer.phone}`} 
++                            style={{ fontSize: '11px', textDecoration: 'none', background: '#2563eb', color: 'white', padding: '4px 10px', borderRadius: '4px', fontWeight: 'bold' }}
++                          >
++                            📞 Call
++                          </a>
++                        </div>
++                      </div>
++                    ))}
++                  </div>
++                )}
++              </motion.div>
++
++              {/* Anomalies Card */}
++              <motion.div variants={itemVariants} className="page-card" style={{ padding: '24px' }}>
++                <h4 className="card-title" style={{ fontSize: '1.15rem', marginBottom: '16px' }}>⚠️ Production Anomalies</h4>
++                
++                {anomalies.length === 0 ? (
++                  <div style={{ padding: '16px', textAlign: 'center', color: '#2563eb', fontWeight: 'bold', background: '#dbeafe', borderRadius: '10px', fontSize: '0.9rem' }}>
++                    📊 Yield patterns stable. No sudden drops detected.
++                  </div>
++                ) : (
++                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
++                    {anomalies.slice(0, 3).map((anomaly, idx) => (
++                      <div 
++                        key={idx} 
++                        style={{ 
++                          padding: '12px', 
++                          borderLeft: '4px solid #ef4444', 
++                          background: 'var(--ds-surface-muted)',
++                          borderRadius: '0 8px 8px 0'
++                        }}
++                      >
++                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'var(--ds-text)', display: 'flex', justifyContent: 'space-between' }}>
++                          <span>📉 Sudden Drop Warning</span>
++                          <span style={{ color: '#ef4444' }}>{anomaly.date}</span>
++                        </div>
++                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--ds-text-muted)', lineHeight: '1.4' }}>
++                          {anomaly.message}
++                        </p>
++                      </div>
++                    ))}
++                  </div>
++                )}
++              </motion.div>
++            </div>
+           </div>
+-          <div className="stat-accent-line" />
+         </motion.div>
+-      </motion.section>
+-
+-      <motion.section
+-        className="premium-card dashboard-orders-card"
+-        initial={{ opacity: 0, y: 20 }}
+-        animate={{ opacity: 1, y: 0 }}
+-        transition={{ delay: 0.15, duration: 0.45 }}
+-        aria-labelledby="recent-orders-heading"
+-      >
+-        <div className="table-header">
+-          <h2 id="recent-orders-heading" className="table-title">
+-            Recent orders
+-          </h2>
+-        </div>
+-
+-        <DataTable
+-          data={recentOrders}
+-          emptyMessage="No orders yet"
+-          animate={false}
+-          columns={[
+-            { label: 'ID', key: 'orderId', className: 'order-id', render: (_, row) => row._id?.slice(-8) || '—' },
+-            { label: 'Customer', key: 'customer', className: 'customer-name', render: (_, row) => row.userId?.username || '—' },
+-            { label: 'Qty', key: 'quantity', className: 'amount', render: (_, row) => row.quantity ?? '—' },
+-            {
+-              label: 'Status',
+-              render: (_, row) => (
+-                <span className={`status-badge status-${row.status || 'pending'}`}>
+-                  {row.status || 'pending'}
+-                </span>
+-              ),
+-            },
+-            { label: 'Date', key: 'createdAt', className: 'date', render: (_, row) => (row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-IN') : '—') },
+-          ]}
+-        />
+-      </motion.section>
++      )}
+     </div>
+   );
+ };
+ 
+-export default AdminDashboard;
++export default AdminDashboard;
+\ No newline at end of file

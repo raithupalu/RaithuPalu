@@ -1,0 +1,213 @@
+diff a/frontend/src/context/LanguageContext.jsx b/frontend/src/context/LanguageContext.jsx	(rejected hunks)
+@@ -5,10 +5,12 @@ const translations = {
+     // Navigation
+     dashboard: 'Dashboard',
+     milkEntry: 'Milk Entry',
++    buffalo: 'Buffalo',
+     orders: 'Orders',
+     payments: 'Payments',
+     customers: 'Customers',
+     expenses: 'Expenses',
++    broadcaster: 'Broadcaster',
+     analytics: 'Analytics',
+     
+     // Common
+@@ -87,100 +89,16 @@ const translations = {
+     deleteConfirm: 'Are you sure you want to delete?',
+     networkError: 'Network error. Please try again.',
+   },
+-  ta: {
+-    // Navigation
+-    dashboard: 'ட্যাষ்போர்டு',
+-    milkEntry: 'பால் எண்ணெய்',
+-    orders: ' ஆர்டர்கள்',
+-    payments: 'பணம்',
+-    customers: 'வாடிக்கையாளர்கள்',
+-    expenses: 'செலவுகள்',
+-    analytics: 'பகுப்பாய்வு',
+-    
+-    // Common
+-    save: 'சேமி',
+-    cancel: 'ரத்து',
+-    delete: 'அழி',
+-    edit: 'திருத்து',
+-    add: 'சேர்',
+-    search: 'தேடு',
+-    filter: 'வடிகட்டு',
+-    export: 'ஏற்று',
+-    loading: 'ஏற்றுகிறது...',
+-    noData: 'தரவு இல்லை',
+-    success: 'வெற்றி',
+-    error: 'பிழை',
+-    warning: 'எச்சரிக்கை',
+-    confirm: 'உறுதிப்படுத்து',
+-    
+-    // Auth
+-    login: 'உள்நுழை',
+-    logout: 'வெளியேறு',
+-    register: 'பதிவு',
+-    username: 'பயன்பாப்பு பெயர்',
+-    password: 'கடவுச்சொல்',
+-    phone: 'தொலைபேசி',
+-    email: 'மின்னஞ்சல்',
+-    
+-    // Dashboard
+-    welcomeBack: 'மீண்டும் வரவேற்கிறோம்!',
+-    todayOrders: 'இன்றைய ஆர்டர்கள்',
+-    totalCustomers: 'மொத்த வாடிக்கையாளர்கள்',
+-    totalRevenue: 'மொத்த வருமானம்',
+-    pendingOrders: 'நிலுவையில் உள்ள ஆர்டர்கள்',
+-    recentOrders: 'சமீபத்திய ஆர்டர்கள்',
+-    
+-    // Milk
+-    quantity: 'அளவு (L)',
+-    rate: 'விகிதம் (₹/L)',
+-    fat: 'கொழுப்பு %',
+-    snf: 'எஸ்என்எஃப் %',
+-    session: 'அமர்வு',
+-    morning: 'காலை',
+-    evening: 'மாலை',
+-    
+-    // Status
+-    pending: 'நிலுவையில்',
+-    confirmed: 'உறுதிப்படுத்தப்பட்டது',
+-    cancelled: 'ரத்து',
+-    accepted: 'ஏற்கப்பட்டது',
+-    rejected: 'மறுக்கப்பட்டது',
+-    paid: 'பணம் செலுத்தியது',
+-    
+-    // Actions
+-    accept: 'ஏற்க',
+-    reject: 'மறு',
+-    viewDetails: 'விவரங்களைக் காண்க',
+-    
+-    // Settings
+-    settings: 'அமைகள்',
+-    profile: 'சுயவிவரம்',
+-    language: 'மொழி',
+-    theme: 'தீம்',
+-    darkMode: 'கரு Mode',
+-    lightMode: 'வெள்ளை Mode',
+-    
+-    // Notifications
+-    notifications: 'அறிவிப்புகள்',
+-    newOrder: 'புதிய ஆர்டர்',
+-    orderAccepted: 'ஆர்டர் ஏற்கப்பட்டது',
+-    orderRejected: 'ஆர்டர் மறுக்கப்பட்டது',
+-    paymentReceived: 'பணம் பெறப்பட்டது',
+-    markAllRead: 'அனைத்தையும் படித்ததாகக் குறி',
+-    
+-    // Messages
+-    savedSuccess: 'வெற்றிகரமாக சேமிக்கப்பட்டது',
+-    deleteConfirm: 'நீக்க விரும்புகிறீர்களா?',
+-    networkError: 'பிழை. மீண்டும் முயற்சிக்கவும்.',
+-  },
+   hi: {
+     // Navigation
+     dashboard: 'डैशबोर्ड',
+     milkEntry: 'दूध प्रविष्टि',
+-    orders: 'आर्डर',
++    buffalo: 'भैंस प्रबंधन',
++    orders: 'आर्डर सूची',
+     payments: 'भुगतान',
+     customers: 'ग्राहक',
+     expenses: 'खर्च',
++    broadcaster: 'प्रसारक',
+     analytics: 'विश्लेषण',
+     
+     // Common
+@@ -258,6 +176,94 @@ const translations = {
+     savedSuccess: 'सफलतापूर्वक सहेजा गया',
+     deleteConfirm: 'क्या आप हटाना चाहते हैं?',
+     networkError: 'त्रुटि। पुनः प्रयास करें।',
++  },
++  te: {
++    // Navigation
++    dashboard: 'డాష్‌బోర్డ్',
++    milkEntry: 'పాల నమోదు',
++    buffalo: 'గేదెల నిర్వహణ',
++    orders: 'ఆర్డర్లు',
++    payments: 'చెల్లింపులు',
++    customers: 'వినియోగదారులు',
++    expenses: 'ఖర్చులు',
++    broadcaster: 'సమాచార ప్రసారం',
++    analytics: 'విశ్లేషణలు',
++    
++    // Common
++    save: 'సేవ్ చేయి',
++    cancel: 'రద్దు చేయి',
++    delete: 'తొలగించు',
++    edit: 'సవరించు',
++    add: 'జోడించు',
++    search: 'వెతకండి',
++    filter: 'వడపోత',
++    export: 'ఎగుమతి',
++    loading: 'లోడ్ అవుతోంది...',
++    noData: 'డేటా అందుబాటులో లేదు',
++    success: 'విజయం',
++    error: 'లోపం',
++    warning: 'హెచ్చరిక',
++    confirm: 'నిర్ధారించు',
++    
++    // Auth
++    login: 'లాగిన్',
++    logout: 'లాగ్అవుట్',
++    register: 'నమోదు చేయి',
++    username: 'వినియోగదారు పేరు',
++    password: 'పాస్‌వర్డ్',
++    phone: 'ఫోన్ నంబర్',
++    email: 'ఈమెయిల్',
++    
++    // Dashboard
++    welcomeBack: 'మళ్ళీ స్వాగతం!',
++    todayOrders: 'ఈరోజు ఆర్డర్లు',
++    totalCustomers: 'మొత్తం వినియోగదారులు',
++    totalRevenue: 'మొత్తం రాబడి',
++    pendingOrders: 'పెండింగ్ ఆర్డర్లు',
++    recentOrders: 'ఇటీవలి ఆర్డర్లు',
++    
++    // Milk
++    quantity: 'పరిమాణం (లీటర్లు)',
++    rate: 'ధర (₹/లీటర్)',
++    fat: 'ఫ్యాట్ %',
++    snf: 'ఎస్.ఎన్.ఎఫ్ %',
++    session: 'సమయం',
++    morning: 'ఉదయం',
++    evening: 'సాయంత్రం',
++    
++    // Status
++    pending: 'పెండింగ్',
++    confirmed: 'స్థిరపడింది',
++    cancelled: 'రద్దు చేయబడింది',
++    accepted: 'ఆమోదించబడింది',
++    rejected: 'తిరస్కరించబడింది',
++    paid: 'చెల్లించబడింది',
++    
++    // Actions
++    accept: 'ఆమోదించు',
++    reject: 'తిరస్కరించు',
++    viewDetails: 'వివరాలు చూడు',
++    
++    // Settings
++    settings: 'సెట్టింగ్లు',
++    profile: 'ప్రొఫైల్',
++    language: 'భాష',
++    theme: 'థీమ్',
++    darkMode: 'డార్క్ మోడ్',
++    lightMode: 'లైట్ మోడ్',
++    
++    // Notifications
++    notifications: 'నోటిఫికేషన్లు',
++    newOrder: 'కొత్త ఆర్డర్ వచ్చింది',
++    orderAccepted: 'ఆర్డర్ ఆమోదించబడింది',
++    orderRejected: 'ఆర్డర్ తిరస్కరించబడింది',
++    paymentReceived: 'చెల్లింపు అందింది',
++    markAllRead: 'అన్నీ చదివినట్లు గుర్తించు',
++    
++    // Messages
++    savedSuccess: 'విజయవంతంగా సేవ్ చేయబడింది',
++    deleteConfirm: 'మీరు ఖచ్చితంగా తొలగించాలనుకుంటున్నారా?',
++    networkError: 'నెట్‌వర్క్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+   }
+ };
+ 

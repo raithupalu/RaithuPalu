@@ -27,6 +27,19 @@ function formatNumber(num) {
  * Generate a professional PDF invoice for milk billing
  * @param {string} filePath - Output file path
  * @param {object} data - Invoice data
+ * @param {string} data.customerName - Customer name
+ * @param {string} data.customerPhone - Customer phone (optional)
+ * @param {string} data.invoiceNumber - Unique invoice number
+ * @param {string} data.billingMonth - Billing month label (e.g., "April 2026")
+ * @param {string} data.billingPeriodStart - Start date
+ * @param {string} data.billingPeriodEnd - End date
+ * @param {Array} data.entries - Milk entry records
+ * @param {number} data.totalLitres - Total litres
+ * @param {number} data.totalAmount - Total amount due
+ * @param {number} data.pricePerLitre - Price per litre
+ * @param {string} data.companyName - Company name
+ * @param {object} data.companyAddress - Company address
+ * @param {string} data.issueDate - Invoice issue date
  */
 function generateInvoicePDF(filePath, data) {
   return new Promise((resolve, reject) => {
@@ -205,6 +218,7 @@ function generateInvoicePDF(filePath, data) {
 
 /**
  * Clean up temporary invoice files
+ * @param {Array<string>} files - Array of file paths to delete
  */
 function cleanupTempFiles(files = []) {
   const allFiles = fs.existsSync(TEMP_DIR) ? fs.readdirSync(TEMP_DIR) : [];
@@ -218,18 +232,25 @@ function cleanupTempFiles(files = []) {
     const filepath = path.join(TEMP_DIR, filename);
     try {
       const stats = fs.statSync(filepath);
+      // Delete if older than 7 days OR explicitly listed
       if (files.length > 0 || (now - stats.mtimeMs) > maxAge) {
         fs.unlinkSync(filepath);
         cleaned++;
       }
     } catch (e) {
-      // ignore
+      // File might not exist, ignore
     }
   });
 
   return cleaned;
 }
 
+/**
+ * Generate unique filename for invoice
+ * @param {string} customerId - Customer ID
+ * @param {string} billingMonth - Billing month label
+ * @returns {string} - Generated filename
+ */
 function generateInvoiceFilename(customerId, billingMonth) {
   const monthSlug = billingMonth.toLowerCase().replace(/\s+/g, '-');
   const timestamp = Date.now();

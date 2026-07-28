@@ -1,0 +1,18 @@
+diff a/backend/routes/notificationRoutes.js b/backend/routes/notificationRoutes.js	(rejected hunks)
+@@ -6,6 +6,7 @@ const {
+   markAsRead,
+   markAllAsRead,
+   sendBillingReminders,
++  sendBroadcast,
+ } = require("../controllers/notificationController");
+ 
+ const protect = require("../middleware/authMiddleware");
+@@ -23,4 +24,7 @@ router.put("/", protect, authorizeRoles("admin"), markAllAsRead);
+ // Send billing reminders
+ router.post("/remind", protect, authorizeRoles("admin"), sendBillingReminders);
+ 
++// Admin sends custom broadcast alerts (WhatsApp + In-App)
++router.post("/broadcast", protect, authorizeRoles("admin"), sendBroadcast);
++
+ module.exports = router;
+\ No newline at end of file

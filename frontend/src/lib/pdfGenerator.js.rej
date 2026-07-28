@@ -1,0 +1,29 @@
+diff a/frontend/src/lib/pdfGenerator.js b/frontend/src/lib/pdfGenerator.js	(rejected hunks)
+@@ -59,8 +59,8 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
+ 
+   doc.setFontSize(10);
+   doc.setTextColor(80, 80, 80);
+-  const headers = ['Date', 'Session', 'Quantity', 'Price'];
+-  const colWidths = [50, 40, 40, 40];
++  const headers = ['Date', 'Session', 'Quantity', 'Price', 'Type'];
++  const colWidths = [45, 30, 30, 30, 35];
+   let x = 20;
+ 
+   headers.forEach((header, i) => {
+@@ -78,6 +78,7 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
+     const session = entry.session.charAt(0).toUpperCase() + entry.session.slice(1);
+     const quantity = entry.quantity >= 1 ? `${entry.quantity}L` : `${entry.quantity * 1000}ml`;
+     const price = `₹${entry.totalPrice.toFixed(2)}`;
++    const typeText = entry.entryType === 'ORDER' ? 'Ordered' : 'Normal';
+ 
+     x = 20;
+     doc.text(date, x, y);
+@@ -87,6 +88,8 @@ export const generateInvoicePDF = async (customerName, month, entries, totals) =
+     doc.text(quantity, x, y);
+     x += colWidths[2];
+     doc.text(price, x, y);
++    x += colWidths[3];
++    doc.text(typeText, x, y);
+     y += 7;
+ 
+     if (y > 270) {

@@ -1,0 +1,40 @@
+diff a/backend/utils/pdfGenerator.js b/backend/utils/pdfGenerator.js	(rejected hunks)
+@@ -123,10 +123,11 @@ function generateInvoicePDF(filePath, data) {
+       // Table header
+       const tableTop = yPos;
+       const colDate = leftMargin;
+-      const colSession = leftMargin + 90;
+-      const colQty = leftMargin + 200;
+-      const colPrice = leftMargin + 260;
+-      const colTotal = leftMargin + 350;
++      const colSession = leftMargin + 80;
++      const colQty = leftMargin + 170;
++      const colPrice = leftMargin + 240;
++      const colTotal = leftMargin + 320;
++      const colType = leftMargin + 410;
+ 
+       doc.fontSize(smallFontSize).font('Helvetica-Bold').fillColor('#000');
+       doc.text('Date', colDate, tableTop);
+@@ -134,6 +135,7 @@ function generateInvoicePDF(filePath, data) {
+       doc.text('Quantity (L)', colQty, tableTop);
+       doc.text('Price/L (₹)', colPrice, tableTop);
+       doc.text('Amount (₹)', colTotal, tableTop);
++      doc.text('Type', colType, tableTop);
+ 
+       // Horizontal line under header
+       doc.moveTo(leftMargin, tableTop + 15).lineTo(rightMargin, tableTop + 15)
+@@ -149,12 +151,14 @@ function generateInvoicePDF(filePath, data) {
+         const quantity = formatNumber(entry.quantity || 0);
+         const price = formatNumber(entry.pricePerLitre || 0);
+         const total = formatNumber(entry.totalPrice || 0);
++        const typeText = entry.entryType === 'ORDER' ? 'Ordered' : 'Normal';
+ 
+         doc.text(date, colDate, yPos);
+         doc.text(session, colSession, yPos);
+         doc.text(quantity, colQty, yPos, { align: 'right' });
+         doc.text(price, colPrice, yPos, { align: 'right' });
+         doc.text(total, colTotal, yPos, { align: 'right' });
++        doc.text(typeText, colType, yPos);
+ 
+         yPos += 16;
+ 

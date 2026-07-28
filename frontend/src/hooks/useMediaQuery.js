@@ -26,14 +26,14 @@ export function useMediaQuery(query) {
  * Breakpoints (per spec):
  *   Desktop (>=1200px) : expanded, width 260px
  *   Laptop  (992-1199) : expanded, width 220px
- *   Tablet  (768-991)  : collapsed (icons only), width 80px
- *   Mobile  (<768)     : hidden by default, slide-out drawer (280px)
+ *   Tablet  (769-991)  : collapsed (icons only), width 80px
+ *   Mobile  (<=768)     : hidden by default, slide-out drawer (280px)
  */
 export function useResponsiveSidebar() {
   const isDesktop = useMediaQuery('(min-width: 1200px)');
   const isLaptop = useMediaQuery('(min-width: 992px) and (max-width: 1199px)');
-  const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 991px)');
-  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isTablet = useMediaQuery('(min-width: 769px) and (max-width: 991px)');
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   let sidebarWidth = 0;
   let collapsed = false;

@@ -171,4 +171,11 @@ export const notificationService = {
   broadcast: (data) => api.post('/api/notifications/broadcast', data),
 };
 
+export const subscriptionService = {
+  getMy: () => api.get('/api/subscriptions/my'),
+  update: (data) => api.put('/api/subscriptions/my', data),
+  toggleVacation: (isActive) => api.post('/api/subscriptions/my/vacation', { isActive }),
+  getAll: () => api.get('/api/subscriptions'),
+};
+
 export default api;

@@ -57,7 +57,7 @@ const menuTheme = {
   },
 };
 
-const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, collapsed }) => {
+const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, collapsed, onClick }) => {
   const Icon = item.icon || FiHome;
   const themeConfig = menuTheme[theme] || menuTheme.light;
   const { t: translate } = useLanguage();
@@ -66,6 +66,7 @@ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, 
     <NavLink
       to={item.path}
       end={item.exact}
+      onClick={onClick}
       className="sidebar__link"
       style={({ isActive: linkActive }) => ({
         display: 'flex',
@@ -104,7 +105,7 @@ const MenuItem = ({ item, theme, isActive, hovered, onMouseEnter, onMouseLeave, 
   );
 };
 
-const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile = false, width = 260 }) => {
+const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile = false, width = 260, onItemClick }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -117,6 +118,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
   const handleLogout = () => {
     logout();
     navigate('/login');
+    if (onItemClick) onItemClick();
   };
 
   const sidebarBg = theme === 'dark'
@@ -180,6 +182,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
               onMouseEnter={() => setHoveredItem(item.path)}
               onMouseLeave={() => setHoveredItem(null)}
               collapsed={collapsed}
+              onClick={onItemClick}
             />
           );
         })}

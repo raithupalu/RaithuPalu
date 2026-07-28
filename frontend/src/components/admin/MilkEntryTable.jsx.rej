@@ -1,0 +1,20 @@
+diff a/frontend/src/components/admin/MilkEntryTable.jsx b/frontend/src/components/admin/MilkEntryTable.jsx	(rejected hunks)
+@@ -1,5 +1,6 @@
+ import React, { useState } from 'react';
+ import DataTable from '../DataTable';
++import EntryTypeBadge from '../EntryTypeBadge';
+ 
+ // ✅ Quantity labels
+ const quantityLabels = {
+@@ -64,6 +65,11 @@ export const MilkEntryTable = ({ entries = [], handleDelete }) => {
+       key: 'session',
+       render: (val) => <span className="session-badge">{val}</span>,
+     },
++    {
++      label: 'Type',
++      key: 'entryType',
++      render: (val) => <EntryTypeBadge type={val || 'NORMAL'} />,
++    },
+     {
+       label: '',
+       key: '_id',
