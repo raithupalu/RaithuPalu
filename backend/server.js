@@ -86,22 +86,30 @@ app.use(
 app.use(morgan(isDev ? "dev" : "combined"));
 
 // ─────────────────────────────────────────────
-// CORS (FIXED)
+// CORS (SELF-HEALING & ROBUST)
 // ─────────────────────────────────────────────
 app.use(
   cors({
     origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps, curl, postman)
       if (!origin) return cb(null, true);
 
-      const allowed = process.env.ALLOWED_ORIGINS
-        ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-        : ["http://localhost:3000"];
+      const parsedAllowed = process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(",")
+            .map((o) => o.trim().replace(/\/$/, "").toLowerCase()) // Trim, remove trailing slash, lowercase
+        : ["http://localhost:3000", "http://localhost:5000"];
 
-      if (allowed.includes(origin)) {
+      const cleanOrigin = origin.trim().replace(/\/$/, "").toLowerCase();
+
+      // Automatically allow localhost, capacitor, and Vercel deployments
+      const isLocal = cleanOrigin.startsWith("http://localhost") || cleanOrigin.startsWith("capacitor://");
+      const isVercel = cleanOrigin.includes("vercel.app");
+
+      if (parsedAllowed.includes(cleanOrigin) || isLocal || isVercel || parsedAllowed.includes("*")) {
         cb(null, true);
       } else {
-        console.warn("Blocked by CORS:", origin);
-        cb(new Error("Not allowed by CORS"));
+        console.warn("Blocked by CORS. Clean Origin:", cleanOrigin, "Allowed List:", parsedAllowed);
+        cb(null, false); // Deny access safely without throwing server-side errors
       }
     },
     credentials: true,
