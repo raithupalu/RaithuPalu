@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RaithuPalu</string>
+    <string name="title_activity_main">RaithuPalu</string>
+    <string name="package_name">com.raithupalu.app</string>
+    <string name="custom_url_scheme">com.raithupalu.app</string>
+</resources>
