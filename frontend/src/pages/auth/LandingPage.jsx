@@ -243,17 +243,17 @@ const LandingPage = () => {
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📧</div>
               <h3 className="feature-title">Email</h3>
-              <p className="feature-desc">info@raithupalu.com</p>
+              <p className="feature-desc">raithupalu</p>
             </div>
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📞</div>
               <h3 className="feature-title">Phone</h3>
-              <p className="feature-desc">+91-9876-543-210</p>
+              <p className="feature-desc">+91 9441609701</p>
             </div>
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📍</div>
               <h3 className="feature-title">Location</h3>
-              <p className="feature-desc">Serving Hyderabad &amp; Secunderabad</p>
+              <p className="feature-desc">DHONE</p>
             </div>
           </div>
         </motion.div>
@@ -262,7 +262,7 @@ const LandingPage = () => {
       <footer className="footer">
         <div className="footer-container">
           <div className="footer-section">
-            <h4>🥛 RaithuPalu</h4>
+            <h4>RaithuPalu</h4>
             <p>Premium farm-to-table dairy solutions for modern families.</p>
           </div>
           <div className="footer-section">
@@ -275,12 +275,12 @@ const LandingPage = () => {
           </div>
           <div className="footer-section">
             <h4>Contact</h4>
-            <p>Email: info@raithupalu.com</p>
-            <p>Phone: +91-9876-543-210</p>
+            <p>Email: </p>
+            <p>Phone: +91 9441609701</p>
           </div>
         </div>
         <div className="footer-bottom">
-          <p>&copy; 2024 RaithuPalu. All rights reserved.</p>
+          <p>&copy; 2026 RaithuPalu. All rights reserved.</p>
         </div>
       </footer>
     </div>
