@@ -1,62 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import Sidebar, { menuConfig } from './Sidebar';
 import SearchModal from './SearchModal';
 import ThemeToggle from './ThemeToggle';
+import MobileBottomNav from './MobileBottomNav';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useResponsiveSidebar } from '../hooks/useMediaQuery';
 import './AppLayout.css';
 
-const MenuIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-);
-
 const AppLayout = ({ role = 'admin' }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { isMobile, sidebarWidth, collapsed } = useResponsiveSidebar();
-  const [isOpen, setIsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const location = useLocation();
-
-  // Close mobile drawer whenever the route changes.
-  useEffect(() => {
-    setIsOpen(false);
-  }, [location.pathname]);
-
-  // Close drawer if we grow past the mobile breakpoint.
-  useEffect(() => {
-    if (!isMobile) setIsOpen(false);
-  }, [isMobile]);
-
-  // Prevent body scrolling when mobile drawer is open
-  useEffect(() => {
-    if (isMobile && isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isMobile, isOpen]);
-
-  // Close on Escape key press
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // Command/Ctrl + K opens search.
   useEffect(() => {
@@ -70,9 +27,6 @@ const AppLayout = ({ role = 'admin' }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const closeDrawer = () => setIsOpen(false);
-  const toggleDrawer = () => setIsOpen(prev => !prev);
-
   return (
     <div className="layout">
       {/* Desktop / Tablet sidebar */}
@@ -80,63 +34,30 @@ const AppLayout = ({ role = 'admin' }) => {
         <Sidebar role={role} theme={theme} collapsed={collapsed} width={sidebarWidth} />
       )}
 
-      {/* Mobile sticky top bar */}
+      {/* Mobile sticky top bar (simplified, hamburger removed as bottom-bar is primary navigation) */}
       {isMobile && (
         <header className="topbar">
-          <button
-            className="topbar__toggle"
-            onClick={toggleDrawer}
-            aria-label="Toggle navigation menu"
-            aria-expanded={isOpen}
-          >
-            <MenuIcon />
-          </button>
-          <span className="topbar__title">RaithuPalu</span>
-          <ThemeToggle />
-          <button
-            className="topbar__avatar"
-            onClick={toggleDrawer}
-            aria-label="Open profile"
-          >
-            {user?.username?.charAt(0)?.toUpperCase()}
-          </button>
+          <span className="topbar__title" style={{ textAlign: 'left', marginLeft: '8px' }}>RaithuPalu</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <ThemeToggle />
+            <div className="topbar__avatar" aria-hidden="true">
+              {user?.username?.charAt(0)?.toUpperCase()}
+            </div>
+          </div>
         </header>
       )}
 
-      {/* Mobile drawer + overlay */}
-      <AnimatePresence>
-        {isMobile && isOpen && (
-          <>
-            <motion.div
-              className="mobile-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={closeDrawer}
-              aria-hidden="true"
-            />
-            <motion.div
-              className="mobile-drawer"
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-              role="dialog"
-              aria-modal="true"
-            >
-              <Sidebar role={role} theme={theme} isMobile width={280} onItemClick={closeDrawer} />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Main content */}
+      {/* Main content scroll area */}
       <main className="main">
         <div className="main__inner">
           <Outlet />
         </div>
       </main>
+
+      {/* Mobile Bottom Dock Navigation (max-width: 768px only) */}
+      {isMobile && (
+        <MobileBottomNav role={role} />
+      )}
 
       <SearchModal
         isOpen={isSearchOpen}
