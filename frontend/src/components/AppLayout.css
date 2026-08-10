@@ -346,3 +346,67 @@
 .mobile-drawer {
   background: var(--ds-sidebar);
 }
+/* =========================================================
+   OPTIMIZED MOBILE DOCK NAVIGATION VIEW (MOBILE-ONLY)
+   Targeting screen widths <= 768px for the mobile app shell.
+   ========================================================= */
+@media (max-width: 768px) {
+  /* 1. Prevent main content scroll areas from colliding with bottom margins */
+  .main {
+    padding-bottom: 80px !important; /* Reserve spacing so navigation dock is visible and clear */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 2. Glassmorphic mobile bottom dock wrapper */
+  .mobile-nav-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(45, 95, 63, 0.12);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* Clean 5-column layout for mobile menus */
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+    padding-bottom: env(safe-area-inset-bottom); /* Auto bezel spacing for bezel-less screens */
+  }
+
+  [data-theme='dark'] .mobile-nav-dock {
+    background: rgba(15, 23, 42, 0.94);
+    border-top-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  /* 3. Dock button items */
+  .dock-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--ds-text-muted);
+    text-decoration: none;
+    font-size: 0.72rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .dock-item--active {
+    color: var(--ds-primary);
+    font-weight: 700;
+  }
+
+  .dock-item svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2.2;
+  }
+}
