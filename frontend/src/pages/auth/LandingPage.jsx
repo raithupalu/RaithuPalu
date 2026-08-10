@@ -243,7 +243,7 @@ const LandingPage = () => {
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📧</div>
               <h3 className="feature-title">Email</h3>
-              <p className="feature-desc">raithupalu</p>
+              <p className="feature-desc">raithupalu@gmail.com</p>
             </div>
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📞</div>
@@ -275,7 +275,7 @@ const LandingPage = () => {
           </div>
           <div className="footer-section">
             <h4>Contact</h4>
-            <p>Email: </p>
+            <p>Email: raithupalu@gmail.com</p>
             <p>Phone: +91 9441609701</p>
           </div>
         </div>
