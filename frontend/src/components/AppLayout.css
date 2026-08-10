@@ -346,6 +346,7 @@
 .mobile-drawer {
   background: var(--ds-sidebar);
 }
+
 /* =========================================================
    OPTIMIZED MOBILE DOCK NAVIGATION VIEW (MOBILE-ONLY)
    Targeting screen widths <= 768px for the mobile app shell.
