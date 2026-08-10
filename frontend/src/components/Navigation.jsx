@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Button from './Button';
@@ -7,7 +7,6 @@ import './Navigation.css';
 
 const Navigation = ({ isAuthenticated, onLogout }) => {
   const navigate = useNavigate();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
     { label: 'Home', href: '/' },
@@ -20,13 +19,11 @@ const Navigation = ({ isAuthenticated, onLogout }) => {
     e.preventDefault();
     if (item.href === '/') {
       navigate('/');
-      setIsMobileMenuOpen(false);
     } else if (item.href.startsWith('#')) {
       const element = document.querySelector(item.href);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      setIsMobileMenuOpen(false);
     }
   };
 
@@ -112,81 +109,11 @@ const Navigation = ({ isAuthenticated, onLogout }) => {
           </motion.div>
         </div>
 
-        {/* Mobile Menu Toggle */}
-        <motion.button
-          className="mobile-menu-toggle"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.6 }}
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </motion.button>
+        {/* Mobile Header Right Panel (ThemeToggle is retained, hamburger is hidden) */}
+        <div className="nav-actions-mobile-only">
+          <ThemeToggle />
+        </div>
       </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <motion.div
-          className="nav-menu-mobile"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {navItems.map((item) => (
-            <motion.a
-              key={item.label}
-              href={item.href}
-              className="nav-link-mobile"
-              onClick={(e) => handleNavClick(e, item)}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {item.label}
-            </motion.a>
-          ))}
-          <div className="nav-mobile-actions">
-            <ThemeToggle />
-            {isAuthenticated ? (
-              <Button 
-                variant="primary" 
-                size="md"
-                onClick={onLogout}
-                style={{ width: '100%' }}
-              >
-                Logout
-              </Button>
-            ) : (
-              <>
-                <Button 
-                  variant="secondary" 
-                  size="md"
-                  onClick={() => {
-                    navigate('/login');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  Login
-                </Button>
-                <Button 
-                  variant="primary" 
-                  size="md"
-                  onClick={() => {
-                    navigate('/register');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  Get Started
-                </Button>
-              </>
-            )}
-          </div>
-        </motion.div>
-      )}
     </motion.nav>
   );
 };

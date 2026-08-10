@@ -136,6 +136,10 @@
   border-top: 1px solid rgba(45, 95, 63, 0.1);
 }
 
+.nav-actions-mobile-only {
+  display: none;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .nav-container {
@@ -165,11 +169,16 @@
   }
 
   .mobile-menu-toggle {
+    display: none;
+  }
+
+  .nav-actions-mobile-only {
     display: flex;
+    align-items: center;
   }
 
   .navigation.menu-open ~ .nav-menu-mobile {
-    display: flex;
+    display: none;
   }
 }
 

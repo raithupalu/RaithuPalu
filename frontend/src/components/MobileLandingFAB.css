@@ -1,0 +1,167 @@
+/* =========================================================
+   Mobile Landing Floating Action Button (FAB) Stylesheet
+   ========================================================= */
+
+/* 1. Hide on desktop viewports by default */
+.mobile-landing-fab-wrapper {
+  display: none !important;
+}
+
+/* 2. Mobile / Tablet breakpoint styling */
+@media (max-width: 768px) {
+  .mobile-landing-fab-wrapper {
+    display: block !important; /* Force visible on mobile */
+    position: fixed;
+    right: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom)); /* Respect safe notch area on modern mobile */
+    z-index: 9999;
+  }
+
+  /* Backdrop Overlay */
+  .fab-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: #000;
+    z-index: 9997;
+  }
+
+  /* Main Circular Trigger */
+  .fab-main-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4caf50, #2d5f3f);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(45, 143, 74, 0.4);
+    z-index: 9999;
+    position: relative;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Expanded Menu Items Panel */
+  .fab-menu-items {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    position: absolute;
+    bottom: 72px;
+    right: 4px;
+    z-index: 9998;
+    pointer-events: auto;
+  }
+
+  /* Floating Option Buttons */
+  .fab-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .fab-menu-text {
+    background-color: #ffffff;
+    color: #1f2937;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+    white-space: nowrap;
+  }
+
+  .fab-menu-icon-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    color: #2d5f3f;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+  }
+
+  /* Distinctive "Get Started" CTA */
+  .fab-cta .fab-menu-text {
+    background: linear-gradient(135deg, #4caf50, #2d5f3f);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(76, 175, 80, 0.3);
+  }
+
+  .fab-cta .fab-menu-icon-circle {
+    background: linear-gradient(135deg, #4caf50, #2d5f3f);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(76, 175, 80, 0.3);
+  }
+
+  /* Distinctive "Login" button */
+  .fab-login .fab-menu-text {
+    background-color: #f3f4f6;
+    color: #2d5f3f;
+    border: 1px solid #d1d5db;
+  }
+
+  .fab-login .fab-menu-icon-circle {
+    background-color: #f3f4f6;
+    color: #2d5f3f;
+    border: 1px solid #d1d5db;
+  }
+
+  /* ────────────────── DARK MODE SUPPORT ────────────────── */
+  .dark .fab-menu-text {
+    background-color: #1e293b;
+    color: #f8fafc;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .dark .fab-menu-icon-circle {
+    background-color: #1e293b;
+    color: #34d399;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .dark .fab-cta .fab-menu-text {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #ffffff;
+    border: none;
+  }
+
+  .dark .fab-cta .fab-menu-icon-circle {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #ffffff;
+    border: none;
+  }
+
+  .dark .fab-login .fab-menu-text {
+    background-color: #334155;
+    color: #34d399;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .dark .fab-login .fab-menu-icon-circle {
+    background-color: #334155;
+    color: #34d399;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}

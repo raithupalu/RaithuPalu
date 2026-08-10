@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../../components/Navigation';
 import Button from '../../components/Button';
+import MobileLandingFAB from '../../components/MobileLandingFAB';
 import './LandingPage.css';
 
 const FloatingElement = ({ delay, duration, x, y, emoji }) => (
@@ -198,6 +199,44 @@ const LandingPage = () => {
         </motion.div>
       </section>
 
+      {/* MOBILE APP DOWNLOADS SECTION */}
+      <section id="mobile-app" className="features-section" style={{ background: 'linear-gradient(135deg, rgba(76,175,80,0.02), rgba(37,99,235,0.02))', borderTop: '1px solid var(--ds-border)', borderBottom: '1px solid var(--ds-border)', padding: '60px 20px' }}>
+        <motion.div
+          className="features-container"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          style={{ textAlign: 'center' }}
+        >
+          <motion.h2 className="section-title" style={{ marginBottom: '12px' }}>
+            RaithuPalu Mobile Apps
+          </motion.h2>
+          <p style={{ maxWidth: '600px', margin: '0 auto 32px', color: 'var(--ds-text-muted)', fontSize: '1rem', lineHeight: '1.6' }}>
+            Manage your daily subscriptions, active milk deliveries, billing reports, and dairy farm operations natively on your Android phone!
+          </p>
+
+          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => window.open('/downloads/RaithuPalu_Customer.apk', '_blank')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', minWidth: '250px', justifyContent: 'center' }}
+            >
+              <span>📱</span> Download Customer APK
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => window.open('/downloads/RaithuPalu_Admin.apk', '_blank')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', minWidth: '250px', justifyContent: 'center' }}
+            >
+              <span>👑</span> Download Admin APK
+            </Button>
+          </div>
+        </motion.div>
+      </section>
+
       <section id="products" className="cta-section">
         <motion.div
           className="cta-container"
@@ -248,12 +287,12 @@ const LandingPage = () => {
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📞</div>
               <h3 className="feature-title">Phone</h3>
-              <p className="feature-desc">+91 9441609701</p>
+              <p className="feature-desc">+91-9441609701</p>
             </div>
             <div className="feature-card" style={{ textAlign: 'center' }}>
               <div className="feature-icon">📍</div>
               <h3 className="feature-title">Location</h3>
-              <p className="feature-desc">DHONE</p>
+              <p className="feature-desc">Dhone</p>
             </div>
           </div>
         </motion.div>
@@ -276,13 +315,16 @@ const LandingPage = () => {
           <div className="footer-section">
             <h4>Contact</h4>
             <p>Email: raithupalu@gmail.com</p>
-            <p>Phone: +91 9441609701</p>
+            <p>Phone: +91-9441609701</p>
           </div>
         </div>
         <div className="footer-bottom">
           <p>&copy; 2026 RaithuPalu. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* MOBILE-ONLY FLOATING ACTION BUTTON (FAB) NAVIGATION MENU (max-width: 768px only) */}
+      <MobileLandingFAB />
     </div>
   );
 };
