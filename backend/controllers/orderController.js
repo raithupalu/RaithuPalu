@@ -14,14 +14,9 @@ exports.placeOrder = async (req, res, next) => {
       throw err;
     }
 
-    if (typeof quantity !== "number" || quantity <= 0) {
-      const err = new Error("Quantity must be a positive number");
-      err.status = 400;
-      throw err;
-    }
-
-    if (!["morning", "evening"].includes(time)) {
-      const err = new Error("Delivery time must be 'morning' or 'evening'");
+    const ALLOWED_ORDER_QUANTITIES = [0.25, 0.5, 0.75, 1, 2, 5];
+    if (typeof quantity !== "number" || !ALLOWED_ORDER_QUANTITIES.includes(quantity)) {
+      const err = new Error("Quantity must be one of: 0.25, 0.5, 0.75, 1, 2, or 5 liters");
       err.status = 400;
       throw err;
     }

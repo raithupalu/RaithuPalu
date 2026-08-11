@@ -20,7 +20,16 @@ router.post(
   protect,
   authorizeRoles("customer"),
   validate([
-    body("quantity").isFloat({ gt: 0 }).withMessage("Quantity must be a positive number"),
+    body("quantity")
+      .isFloat({ gt: 0 })
+      .withMessage("Quantity must be a positive number")
+      .custom((val) => {
+        const allowed = [0.25, 0.5, 0.75, 1, 2, 5];
+        if (!allowed.includes(Number(val))) {
+          throw new Error("Quantity must be one of: 1/4 L, 1/2 L, 3/4 L, 1 L, 2 L, 5 L");
+        }
+        return true;
+      }),
     body("time").isIn(["morning", "evening"]).withMessage("Delivery time must be 'morning' or 'evening'"),
   ]),
   placeOrder

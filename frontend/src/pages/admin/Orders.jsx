@@ -7,6 +7,7 @@ import PageHeader from '../../components/PageHeader';
 import Button from '../../components/Button';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
+import { formatMilkQuantity } from '../../lib/utils';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -273,7 +274,7 @@ const AdminOrders = () => {
           columns={[
             { label: 'Order ID', key: 'orderId', className: 'order-id', render: (_, row) => row._id?.slice(-8) || 'N/A' },
             { label: 'Customer', key: 'customer', className: 'customer-name', render: (_, row) => row.userId?.username || 'N/A' },
-            { label: 'Quantity', key: 'quantity', className: 'quantity', render: (_, row) => `${row.quantity || 0}L` },
+            { label: 'Quantity', key: 'quantity', className: 'quantity', render: (_, row) => formatMilkQuantity(row.quantity) },
             {
               label: 'Time Slot',
               key: 'time',

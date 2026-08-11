@@ -38,3 +38,16 @@ export const getStatusColor = (status) => {
     default: return 'bg-slate-100 text-slate-600';
   }
 };
+
+export const formatMilkQuantity = (qty) => {
+  const q = Number(qty || 0);
+  if (q === 0.25) return '1/4 L';
+  if (q === 0.5) return '1/2 L';
+  if (q === 0.75) return '3/4 L';
+  if (q === 1) return '1 L';
+  if (q === 2) return '2 L';
+  if (q === 5) return '5 L';
+  if (q === 10) return '10 L';
+  if (q === 20) return '20 L';
+  return `${q} L`;
+};

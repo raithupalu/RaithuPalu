@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import DataTable from '../DataTable';
 import EntryTypeBadge from '../EntryTypeBadge';
+import { formatBusinessDate } from '../../lib/dates';
 
 // ✅ Quantity labels
 const quantityLabels = {
@@ -13,13 +14,8 @@ const quantityLabels = {
 };
 
 export const MilkEntryTable = ({ entries = [], handleDelete }) => {
-  const [deletingId, setDeletingId] = useState(null);
-
-  const onDelete = (id) => {
-    if (!window.confirm('Delete this entry?')) return;
-
-    setDeletingId(id);
-    handleDelete(id);
+  const onDelete = (row) => {
+    handleDelete(row);
   };
 
   const formatQty = (qty) => {
@@ -35,7 +31,7 @@ export const MilkEntryTable = ({ entries = [], handleDelete }) => {
     {
       label: 'Date',
       key: 'date',
-      render: (val) => (val ? new Date(val).toLocaleDateString('en-IN') : '—'),
+      render: (val) => formatBusinessDate(val),
     },
     {
       label: 'Customer',
@@ -73,14 +69,13 @@ export const MilkEntryTable = ({ entries = [], handleDelete }) => {
     {
       label: '',
       key: '_id',
-      render: (val) => (
+      render: (val, row) => (
         <button
           type="button"
-          onClick={() => onDelete(val)}
+          onClick={() => onDelete(row)}
           className="btn-delete"
-          disabled={deletingId === val}
         >
-          {deletingId === val ? '...' : '🗑️'}
+          🗑️
         </button>
       ),
     },

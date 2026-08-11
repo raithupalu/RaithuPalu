@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { milkService, userService } from '../../services/api';
 import { extractListFromResponse } from '../../lib/apiNormalize';
-import { sortByDateDescending } from '../../lib/dates';
+import { sortByDateDescending, formatBusinessDate } from '../../lib/dates';
 import { PageError } from '../../components/PageState';
 import { DashboardSkeleton } from '../../components/Skeleton';
 import { adminDashboardQueryKey } from '../../hooks/useAdminDashboard';
@@ -22,6 +22,10 @@ const MilkEntry = () => {
   const [showModal, setShowModal] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'normal' | 'order'
   const [sortOrder, setSortOrder] = useState('none'); // 'none' | 'normal' | 'order'
+
+  // Delete modal states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState(null);
 
   // Form state for modal
   const [formData, setFormData] = useState({
@@ -96,28 +100,37 @@ const MilkEntry = () => {
           entries: old.entries.filter((e) => e._id !== id),
         };
       });
+      queryClient.invalidateQueries({ queryKey: adminDashboardQueryKey() });
     },
   });
 
   // Handle form submission from modal
   const handleSubmit = (data) => {
-    const dateOnly = new Date(data.date);
-    dateOnly.setHours(0, 0, 0, 0);
-
+    // Send the raw input date string directly to avoid timezone conversions!
     createMutation.mutate({
       userId: data.userId,
       quantity: data.quantity,
       pricePerLitre: data.pricePerLitre,
       session: data.session,
-      date: dateOnly,
+      date: data.date, 
       totalPrice: data.total,
-      entryType: "NORMAL", // Explicit manually entered type
+      entryType: "NORMAL", 
     });
   };
 
-  const handleDelete = (id) => {
-    if (!window.confirm('Delete this milk entry? This action cannot be undone.')) return;
-    deleteMutation.mutate(id);
+  const handleDelete = (entry) => {
+    setEntryToDelete(entry);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!entryToDelete) return;
+    deleteMutation.mutate(entryToDelete._id, {
+      onSuccess: () => {
+        setDeleteModalOpen(false);
+        setEntryToDelete(null);
+      }
+    });
   };
 
   // Modal handlers
@@ -339,6 +352,39 @@ const MilkEntry = () => {
               banner={submitStatus}
               isModal={true}
             />
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Details Modal */}
+      <AnimatePresence>
+        {deleteModalOpen && entryToDelete && (
+          <Modal
+            isOpen={deleteModalOpen}
+            onClose={() => {
+              setDeleteModalOpen(false);
+              setEntryToDelete(null);
+            }}
+            onConfirm={confirmDelete}
+            title="Delete Milk Entry"
+            type="danger"
+            confirmText={deleteMutation.isPending ? "Deleting..." : "Delete Record"}
+            cancelText="Cancel"
+            confirmDisabled={deleteMutation.isPending}
+          >
+            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--ds-text-muted)', lineHeight: '1.5' }}>
+                Are you sure you want to permanently remove this milk record? This action cannot be undone and will update your dynamic totals instantly.
+              </p>
+              
+              <div style={{ padding: '16px', background: 'var(--ds-surface-muted)', borderRadius: '12px', border: '1px solid var(--ds-border)', display: 'grid', gridTemplateColumns: '1fr', gap: '8px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>
+                <div>👤 <strong>Customer:</strong> {entryToDelete.userId?.username || entryToDelete.userId?.name || '—'}</div>
+                <div>📅 <strong>Date:</strong> {formatBusinessDate(entryToDelete.date)}</div>
+                <div>🌅 <strong>Session:</strong> <span style={{ textTransform: 'capitalize' }}>{entryToDelete.session}</span></div>
+                <div>🥛 <strong>Quantity:</strong> {entryToDelete.quantity} L</div>
+                <div>💰 <strong>Amount:</strong> ₹{Number(entryToDelete.totalPrice || 0).toFixed(2)}</div>
+              </div>
+            </div>
           </Modal>
         )}
       </AnimatePresence>

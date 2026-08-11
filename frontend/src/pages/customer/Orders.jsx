@@ -3,11 +3,12 @@ import { motion } from 'framer-motion';
 import { orderService } from '../../services/api';
 import { extractListFromResponse } from '../../lib/apiNormalize';
 import DataTable from '../../components/DataTable';
+import { formatMilkQuantity } from '../../lib/utils';
 import './CustomerPages.css';
 import PageHeader from '../../components/PageHeader';
 
 const PRICE_PER_LITRE = 80; // ₹/L — keep in sync with backend DEFAULT_PRICE_PER_LITRE
-const QUANTITY_PRESETS = [0.5, 1, 2, 5, 10, 20];
+const QUANTITY_PRESETS = [0.25, 0.5, 0.75, 1, 2, 5];
 
 const CustomerOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -37,7 +38,7 @@ const CustomerOrders = () => {
     const qty = Number(formData.quantity);
     const newErrors = {};
     if (!qty || qty <= 0) newErrors.quantity = 'Please select a quantity';
-    else if (qty < 0.5 || qty > 100) newErrors.quantity = 'Quantity must be between 0.5 and 100 liters';
+    else if (!QUANTITY_PRESETS.includes(qty)) newErrors.quantity = 'Invalid quantity selection';
     return newErrors;
   };
 
@@ -53,7 +54,7 @@ const CustomerOrders = () => {
         await orderService.create({
           quantity: qty,
           time: formData.time,
-          description: `Delivery: ${formData.time === 'morning' ? 'Morning' : 'Evening'} - ${qty}L - ₹${total.toFixed(2)}`
+          description: `Delivery: ${formData.time === 'morning' ? 'Morning' : 'Evening'} - ${formatMilkQuantity(qty)} - ₹${total.toFixed(2)}`
         });
         setFormData({ quantity: 1, time: 'morning' });
         setShowForm(false);
@@ -162,7 +163,7 @@ const CustomerOrders = () => {
                     }}
                     aria-pressed={formData.quantity === q}
                   >
-                    {q} L
+                    {formatMilkQuantity(q)}
                   </button>
                 ))}
               </div>
@@ -230,7 +231,7 @@ const CustomerOrders = () => {
           animate={false}
           columns={[
             { label: 'Order ID', key: 'orderId', className: 'date-cell', render: (_, row) => row._id?.slice(-8) || '-' },
-            { label: 'Quantity', key: 'quantity', className: 'qty-cell', render: (_, row) => `${Number(row.quantity).toFixed(2)} L` },
+            { label: 'Quantity', key: 'quantity', className: 'qty-cell', render: (_, row) => formatMilkQuantity(row.quantity) },
             { label: 'Amount', className: 'amount-cell', render: (_, row) => `₹${((Number(row.quantity) || 0) * PRICE_PER_LITRE).toFixed(2)}` },
             { label: 'Time', key: 'time', render: (_, row) => (row.time === 'morning' ? '🌅 Morning' : '🌆 Evening') },
             {
