@@ -60,33 +60,14 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 
 // ─────────────────────────────────────────────
-// RATE LIMIT
-// ─────────────────────────────────────────────
-app.use(
-  "/api",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isDev ? 500 : 100,
-    message: { message: "Too many requests" },
-  })
-);
-
-app.use(
-  "/api/auth",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isDev ? 50 : 10,
-    message: { message: "Too many login attempts" },
-  })
-);
-
-// ─────────────────────────────────────────────
-// LOGGING
-// ─────────────────────────────────────────────
-app.use(morgan(isDev ? "dev" : "combined"));
-
-// ─────────────────────────────────────────────
 // CORS (SELF-HEALING & ROBUST)
+// MUST run BEFORE any rate limiters / routes so that even error responses
+// (e.g. HTTP 429 from the rate limiter) still carry the correct
+// Access-Control-Allow-Origin header. If CORS runs after a middleware that
+// short-circuits with an error, the browser sees a missing CORS header and
+// reports a misleading "No 'Access-Control-Allow-Origin' header present"
+// failure. The `cors()` middleware also automatically answers OPTIONS
+// preflight requests for matching routes.
 // ─────────────────────────────────────────────
 app.use(
   cors({
@@ -115,6 +96,38 @@ app.use(
     credentials: true,
   })
 );
+
+// ─────────────────────────────────────────────
+// RATE LIMIT
+// OPTIONS preflight requests are skipped so they never consume the budget.
+// Browsers send an OPTIONS preflight before every cross-origin request; if
+// preflights counted here, a handful of logins would exhaust the /api/auth
+// limit and start returning 429 (with the CORS error symptoms described above).
+// ─────────────────────────────────────────────
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: isDev ? 500 : 100,
+    skip: (req) => req.method === "OPTIONS",
+    message: { message: "Too many requests" },
+  })
+);
+
+app.use(
+  "/api/auth",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: isDev ? 50 : 30,
+    skip: (req) => req.method === "OPTIONS",
+    message: { message: "Too many login attempts" },
+  })
+);
+
+// ─────────────────────────────────────────────
+// LOGGING
+// ─────────────────────────────────────────────
+app.use(morgan(isDev ? "dev" : "combined"));
 
 // ─────────────────────────────────────────────
 // STATIC BACKGROUND
