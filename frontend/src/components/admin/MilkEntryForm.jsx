@@ -118,7 +118,10 @@ export const MilkEntryForm = ({
         <div className={`alert ${banner.type}`}>{banner.text}</div>
       )}
 
-      <form onSubmit={submitForm} className="milk-entry-form">
+      {/* id is used so the footer "Save Milk Entry" button (which sits where the
+          Confirm button used to be) can submit this form and keep the exact
+          same validation + save behaviour. */}
+      <form id="milk-entry-form" onSubmit={submitForm} className="milk-entry-form">
         <CustomerSelect
           value={formData.userId}
           onChange={handleChange}
@@ -168,13 +171,19 @@ export const MilkEntryForm = ({
           </div>
         </div>
 
-        <Button
-          type="submit"
-          variant="submit"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Milk Entry'}
-        </Button>
+        {/* In modal usage the single "Save Milk Entry" button is rendered in
+            the Modal footer (occupying the position of the removed Confirm
+            button). For any non-modal/standalone usage, render it here so the
+            form still has a submit button. */}
+        {!isModal && (
+          <Button
+            type="submit"
+            variant="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Milk Entry'}
+          </Button>
+        )}
       </form>
     </motion.div>
   );

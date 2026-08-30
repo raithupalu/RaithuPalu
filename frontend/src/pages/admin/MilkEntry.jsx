@@ -106,7 +106,6 @@ const MilkEntry = () => {
 
   // Handle form submission from modal
   const handleSubmit = (data) => {
-    // Send the raw input date string directly to avoid timezone conversions!
     createMutation.mutate({
       userId: data.userId,
       quantity: data.quantity,
@@ -143,6 +142,17 @@ const MilkEntry = () => {
   const closeModal = () => {
     setShowModal(false);
     setSubmitStatus(null);
+  };
+
+  // Triggers submission of the form inside MilkEntryForm. The "Save Milk Entry"
+  // button now lives in the Modal footer (in the position of the removed
+  // Confirm button), so it submits the form programmatically to keep the exact
+  // same validation + save behaviour.
+  const handleSaveFromFooter = () => {
+    const formEl = document.getElementById('milk-entry-form');
+    if (formEl && typeof formEl.requestSubmit === 'function') {
+      formEl.requestSubmit();
+    }
   };
 
   // Filter and sort entries dynamically
@@ -340,8 +350,13 @@ const MilkEntry = () => {
           <Modal
             isOpen={showModal}
             onClose={closeModal}
+            onConfirm={handleSaveFromFooter}
             title="Add Milk Entry"
             size="lg"
+            type="success"
+            confirmText={createMutation.isPending ? 'Saving...' : 'Save Milk Entry'}
+            cancelText="Cancel"
+            confirmDisabled={createMutation.isPending}
           >
             <MilkEntryForm
               formData={formData}
