@@ -8,13 +8,16 @@ import {
   amountPaid,
   amountPending,
   isFullyPaid,
-  displayStatus,
+  paymentStatus,
+  previousBalance,
 } from '../../lib/paymentUtils';
 import { PageLoading, PageError } from '../../components/PageState';
 import Modal from '../../components/Modal';
 import Button from '../../components/Button';
 import DataTable from '../../components/DataTable';
 import { useToast } from '../../components/Toast';
+import { SearchableCustomerSelect } from '../../components/admin/MilkEntryFormFields';
+import PaymentModal from '../../components/PaymentModal';
 import './AdminPages.css';
 import PageHeader from '../../components/PageHeader';
 
@@ -40,6 +43,7 @@ const AdminPayments = () => {
   });
   const [paymentToDelete, setPaymentToDelete] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [paymentBill, setPaymentBill] = useState(null); // bill currently receiving a payment
 
   // Generate years: current year - 1, current year, current year + 1, current year + 2
   const currentYear = new Date().getFullYear();
@@ -72,14 +76,21 @@ const AdminPayments = () => {
     },
   });
 
-  const markPaidMutation = useMutation({
-    mutationFn: (id) => paymentService.update(id, { markPaid: true }),
-    onSuccess: () => {
+  // Record a full or partial payment. Sends the amount to pay; the backend
+  // validates against the current pending amount and appends to payment history.
+  const recordPaymentMutation = useMutation({
+    mutationFn: ({ id, amount }) => paymentService.update(id, { paid: amount }),
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: paymentsKey });
-      addToast('Bill marked as paid.', 'success');
+      setPaymentBill(null);
+      const fullyPaid = amountPending(res.data?.payment) <= 0.001;
+      addToast(
+        fullyPaid ? 'Bill fully paid.' : 'Payment recorded.',
+        'success'
+      );
     },
     onError: (err) => {
-      addToast(err?.message || 'Failed to mark bill as paid', 'error');
+      addToast(err?.message || 'Failed to record payment', 'error');
     },
   });
 
@@ -246,29 +257,21 @@ const AdminPayments = () => {
 
         <form onSubmit={handleCreate} className="payments-billing-form">
           <div className="payments-form-field payments-form-field--full">
-            <label htmlFor="userId" className="form-label">Customer</label>
-            <select
-              id="userId"
-              className="form-select-custom"
+            <SearchableCustomerSelect
               value={userId}
-              onChange={(e) => {
-                setUserId(e.target.value);
-                if (validationTouched.userId) setValidationTouched((prev) => ({ ...prev, userId: true }));
+              onChange={(id) => {
+                setUserId(id);
+                setValidationTouched((prev) => ({ ...prev, userId: true }));
               }}
-              onBlur={() => setValidationTouched((prev) => ({ ...prev, userId: true }))}
-              aria-invalid={Boolean(validationTouched.userId && validationErrors.userId)}
-              required
-            >
-              <option value="">Select customer…</option>
-              {users.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.username}
-                </option>
-              ))}
-            </select>
-            {validationTouched.userId && validationErrors.userId && (
-              <span className="field-error-text">{validationErrors.userId}</span>
-            )}
+              users={users}
+              error={
+                validationTouched.userId && validationErrors.userId
+                  ? validationErrors.userId
+                  : null
+              }
+              label="Customer"
+              placeholder="Select customer…"
+            />
           </div>
 
           <div className="payments-form-row">
@@ -374,13 +377,18 @@ const AdminPayments = () => {
               { label: 'Period', render: (_, row) => row.month || '—' },
               { label: 'Litres', render: (_, row) => Number(row.totalLitres || 0).toFixed(2) },
               { label: 'Bill', render: (_, row) => `₹${billTotal(row).toFixed(2)}` },
+              { label: 'Prev Bal', render: (_, row) => `₹${previousBalance(row).toFixed(2)}` },
               { label: 'Paid', render: (_, row) => `₹${amountPaid(row).toFixed(2)}` },
               { label: 'Pending', render: (_, row) => `₹${amountPending(row).toFixed(2)}` },
-              { label: 'Status', render: (_, row) => (
-                <span className={`status-badge status-${displayStatus(row)}`}>
-                  {displayStatus(row)}
-                </span>
-              )},
+              { label: 'Status', render: (_, row) => {
+                const st = paymentStatus(row);
+                const labelMap = { paid: 'Paid', partial: 'Partially Paid', pending: 'Pending' };
+                return (
+                  <span className={`status-badge status-${st === 'partial' ? 'partially' : st}`}>
+                    {labelMap[st] || 'Pending'}
+                  </span>
+                );
+              }},
               {
                 label: 'Actions',
                 render: (_, row) => (
@@ -407,12 +415,12 @@ const AdminPayments = () => {
                       <motion.button
                         type="button"
                         className="btn-action btn-accept"
-                        disabled={markPaidMutation.isPending}
-                        onClick={() => markPaidMutation.mutate(row._id)}
+                        onClick={() => setPaymentBill(row)}
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
+                        title="Record a full or partial payment"
                       >
-                        Mark paid
+                        {amountPending(row) > 0 && amountPaid(row) > 0 ? 'Payment' : 'Receive Payment'}
                       </motion.button>
                     ) : (
                       <span style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.875rem' }}>Settled</span>
@@ -435,6 +443,16 @@ const AdminPayments = () => {
             emptyMessage="No bills yet — generate one above."
           />
       </motion.div>
+
+      <PaymentModal
+        bill={paymentBill}
+        customerName={paymentBill?.userId?.username}
+        onClose={() => setPaymentBill(null)}
+        onConfirm={(amount) =>
+          recordPaymentMutation.mutate({ id: paymentBill._id, amount })
+        }
+        isPending={recordPaymentMutation.isPending}
+      />
 
       <Modal
         isOpen={Boolean(paymentToDelete)}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAdminDashboard } from '../../hooks/useAdminDashboard';
 import { PageError } from '../../components/PageState';
@@ -24,6 +25,23 @@ const itemVariants = {
 const AdminDashboard = () => {
   const { data, isPending, isError, error, refetch } = useAdminDashboard();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ai'
+  const navigate = useNavigate();
+
+  // Navigate to an existing admin page. Opens in a new tab on cmd/ctrl+click.
+  const goTo = (path) => (e) => {
+    if (e && (e.metaKey || e.ctrlKey || e.shiftKey)) return; // let browser handle modifier clicks
+    if (e && e.button && e.button !== 0) return; // only left click
+    e.preventDefault();
+    navigate(path);
+  };
+
+  // Keyboard activation (Enter/Space) for interactive cards.
+  const activate = (path) => (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigate(path);
+    }
+  };
 
   if (isPending) {
     return <DashboardSkeleton />;
@@ -87,7 +105,16 @@ const AdminDashboard = () => {
             className="stats-grid stats-grid--dashboard"
             aria-label="Key metrics"
           >
-            <motion.div variants={itemVariants} className="ds-stat-card">
+            <motion.div
+              variants={itemVariants}
+              className="ds-stat-card"
+              role="link"
+              tabIndex={0}
+              aria-label="View customers"
+              onClick={goTo('/admin/customers')}
+              onKeyDown={activate('/admin/customers')}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="stat-icon" aria-hidden>👥</div>
               <div className="stat-content">
                 <p className="stat-label">Customers</p>
@@ -96,7 +123,16 @@ const AdminDashboard = () => {
               <div className="stat-accent-line" />
             </motion.div>
 
-            <motion.div variants={itemVariants} className="ds-stat-card">
+            <motion.div
+              variants={itemVariants}
+              className="ds-stat-card"
+              role="link"
+              tabIndex={0}
+              aria-label="Open milk entry"
+              onClick={goTo('/admin/milk')}
+              onKeyDown={activate('/admin/milk')}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="stat-icon" aria-hidden>🥛</div>
               <div className="stat-content">
                 <p className="stat-label">Today&apos;s milk</p>
@@ -105,7 +141,16 @@ const AdminDashboard = () => {
               <div className="stat-accent-line" />
             </motion.div>
 
-            <motion.div variants={itemVariants} className="ds-stat-card">
+            <motion.div
+              variants={itemVariants}
+              className="ds-stat-card"
+              role="link"
+              tabIndex={0}
+              aria-label="View payments collected this month"
+              onClick={goTo('/admin/payments')}
+              onKeyDown={activate('/admin/payments')}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="stat-icon" aria-hidden>💰</div>
               <div className="stat-content">
                 <p className="stat-label">Collected this month</p>
@@ -114,7 +159,16 @@ const AdminDashboard = () => {
               <div className="stat-accent-line" />
             </motion.div>
 
-            <motion.div variants={itemVariants} className="ds-stat-card">
+            <motion.div
+              variants={itemVariants}
+              className="ds-stat-card"
+              role="link"
+              tabIndex={0}
+              aria-label="View pending orders"
+              onClick={goTo('/admin/orders')}
+              onKeyDown={activate('/admin/orders')}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="stat-icon" aria-hidden>📦</div>
               <div className="stat-content">
                 <p className="stat-label">Pending orders</p>
@@ -123,7 +177,16 @@ const AdminDashboard = () => {
               <div className="stat-accent-line" />
             </motion.div>
 
-            <motion.div variants={itemVariants} className="ds-stat-card">
+            <motion.div
+              variants={itemVariants}
+              className="ds-stat-card"
+              role="link"
+              tabIndex={0}
+              aria-label="View total expenses"
+              onClick={goTo('/admin/expenses')}
+              onKeyDown={activate('/admin/expenses')}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="stat-icon" aria-hidden>📋</div>
               <div className="stat-content">
                 <p className="stat-label">Total expenses</p>

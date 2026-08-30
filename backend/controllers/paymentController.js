@@ -70,6 +70,32 @@ function resolveBillPeriod(monthInput) {
   return null;
 }
 
+/** Period key for chronological comparison: "2026-08" sorts correctly. */
+function periodKey(period) {
+  return period
+    ? `${period.year}-${String(period.monthIndex + 1).padStart(2, "0")}`
+    : "";
+}
+
+/**
+ * Compute the customer's outstanding balance from ALL PRIOR bills (billing
+ * periods strictly earlier than `targetPeriod`). Only unpaid amounts from
+ * previous billing periods carry forward — counted once, never duplicated.
+ */
+async function getPreviousOutstanding(userId, targetPeriod) {
+  const payments = await Payment.find({ userId }).lean();
+
+  let outstanding = 0;
+  for (const p of payments) {
+    const pPeriod = resolveBillPeriod(p.month);
+    if (!pPeriod) continue;
+    if (periodKey(pPeriod) < periodKey(targetPeriod)) {
+      outstanding += Number(p.pending || 0);
+    }
+  }
+  return Math.round(outstanding * 100) / 100;
+}
+
 // Generate monthly bill (admin)
 exports.generateBill = async (req, res, next) => {
   try {
@@ -102,37 +128,45 @@ exports.generateBill = async (req, res, next) => {
       date: { $gte: startDate, $lte: endDate },
     });
 
-    const { totalLitres, totalAmount: rawTotal, pricePerLitreSum } = summarizeMilkEntriesForBill(entries);
+    const { totalLitres, totalAmount: rawMilkCharges, pricePerLitreSum } = summarizeMilkEntriesForBill(entries);
     const avgPricePerLitre =
       entries.length > 0 ? Math.round((pricePerLitreSum / entries.length) * 100) / 100 : 0;
-    const totalAmount = Math.round(rawTotal * 100) / 100;
+    const milkCharges = Math.round(rawMilkCharges * 100) / 100;
 
     const existingBill = await Payment.findOne({ userId, month: period.label });
     if (existingBill && !force) {
-      return res.status(409).json({ 
+      return res.status(409).json({
         message: "Bill already generated for this month",
         payment: existingBill,
       });
     }
 
-    // If exists and force=true, delete the old bill
+    // If exists and force=true, delete the old bill.
     if (existingBill && force) {
       await Payment.deleteOne({ _id: existingBill._id });
     }
+
+    // Previous outstanding from bills BEFORE this period (database source of truth).
+    const previousBalance = await getPreviousOutstanding(userId, period);
+
+    // Final payable = current milk charges + previous outstanding.
+    const totalAmount = Math.round((milkCharges + previousBalance) * 100) / 100;
 
     const payment = await Payment.create({
       userId,
       month: period.label,
       totalLitres,
       pricePerLitre: avgPricePerLitre,
+      milkCharges,
+      previousBalance,
       totalAmount,
       paid: 0,
       pending: totalAmount,
+      payments: [],
     });
 
-    // Create notification for admin
     await Notification.create({
-      userId: null, // Admin notification
+      userId: null,
       message: `New bill generated: ${period.label} - ₹${totalAmount.toFixed(2)}`,
       type: "payment",
       relatedId: payment._id,
@@ -172,10 +206,12 @@ exports.getAllPayments = async (req, res, next) => {
   }
 };
 
-// Add partial payment, full settle via markPaid, or legacy { paid: number } increment
+// Add partial payment, full settle via markPaid, or legacy { paid: number } increment.
+// Every payment is validated against the DB's current pending and appended to the
+// payment history array. Multiple payments accumulate (never overwrite history).
 exports.updatePayment = async (req, res, next) => {
   try {
-    const { paid, markPaid } = req.body;
+    const { paid, markPaid, note } = req.body;
     const payment = await Payment.findById(req.params.id);
 
     if (!payment) {
@@ -184,32 +220,50 @@ exports.updatePayment = async (req, res, next) => {
       throw err;
     }
 
-    if (markPaid === true) {
-      payment.paid = payment.totalAmount;
-      payment.pending = 0;
-      await payment.save();
-      return res.json({ message: "Bill marked as paid", payment });
-    }
+    let amount = 0;
 
-    if (typeof paid !== "number" || paid < 0 || Number.isNaN(paid)) {
+    if (markPaid === true) {
+      amount = Number(payment.pending || 0);
+    } else if (typeof paid === "number" && !Number.isNaN(paid)) {
+      if (paid <= 0) {
+        const err = new Error("Payment amount must be greater than 0");
+        err.status = 400;
+        throw err;
+      }
+      amount = Math.round(paid * 100) / 100;
+    } else {
       const err = new Error("Please provide a valid paid amount (number) or markPaid: true");
       err.status = 400;
       throw err;
     }
 
-    const newPaid = payment.paid + paid;
-    if (newPaid > payment.totalAmount) {
-      const err = new Error(`Payment exceeds total bill. Total: ${payment.totalAmount}, Paid: ${payment.paid}, Trying to add: ${paid}`);
+    // Backend is the source of truth: never allow overpayment against pending.
+    const remaining = Number(payment.pending || 0);
+    if (amount > remaining + 0.001) {
+      const err = new Error(
+        `Payment exceeds current pending amount. Pending: ${remaining.toFixed(2)}, Payment: ${amount.toFixed(2)}`
+      );
       err.status = 400;
       throw err;
     }
 
+    const newPaid = Math.round((payment.paid + amount) * 100) / 100;
+    const newPending = Math.round((payment.totalAmount - newPaid) * 100) / 100;
+
     payment.paid = newPaid;
-    payment.pending = Math.round((payment.totalAmount - payment.paid) * 100) / 100;
+    payment.pending = newPending < 0 ? 0 : newPending;
+
+    // Append to history (preserve all prior payments).
+    payment.payments.push({
+      amount,
+      date: new Date(),
+      note: note || "",
+    });
+
     await payment.save();
 
     res.json({
-      message: "Payment updated",
+      message: newPending <= 0.001 ? "Bill fully paid" : "Payment recorded",
       payment,
     });
   } catch (error) {

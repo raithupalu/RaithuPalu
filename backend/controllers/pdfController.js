@@ -92,13 +92,19 @@ exports.downloadInvoice = async (req, res) => {
       0
     );
 
-    const totalAmount = entries.reduce(
-      (sum, e) => sum + (e.totalPrice || 0),
-      0
+    // Current-month milk charges come from the entries.
+    const milkCharges = Number(
+      entries.reduce((sum, e) => sum + (e.totalPrice || 0), 0).toFixed(2)
     );
 
     const avgPrice =
-      totalLitres > 0 ? (totalAmount / totalLitres).toFixed(2) : 0;
+      totalLitres > 0 ? (milkCharges / totalLitres).toFixed(2) : 0;
+
+    // Previous outstanding + final payable from the persisted bill (DB is source of truth).
+    const previousBalance = Number(payment.previousBalance || 0);
+    const totalAmount = Number(payment.totalAmount ?? (milkCharges + previousBalance));
+    const paid = Number(payment.paid || 0);
+    const pending = Number(payment.pending ?? Math.max(0, totalAmount - paid));
 
     // Generate a temporary file and send it as a download. This keeps the PDF generator simple
     const filename = generateInvoiceFilename(payment.userId._id.toString(), payment.month || 'invoice');
@@ -113,7 +119,11 @@ exports.downloadInvoice = async (req, res) => {
       billingPeriodEnd: endDate.toISOString().split('T')[0],
       totalLitres: Number(totalLitres.toFixed(2)),
       pricePerLitre: avgPrice,
+      milkCharges: Number(milkCharges.toFixed(2)),
+      previousBalance,
       totalAmount: Number(totalAmount.toFixed(2)),
+      paid,
+      pending,
       entries,
       invoiceNumber: payment._id.toString(),
       issueDate: new Date().toLocaleDateString('en-IN'),

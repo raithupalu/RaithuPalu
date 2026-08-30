@@ -3,7 +3,7 @@
 .customer-dashboard,
 .customer-page {
   padding: 40px;
-  background: linear-gradient(135deg, #f5f1e8 0%, #e8e3d8 100%);
+  background: transparent;
   min-height: 100vh;
 }
 
@@ -286,11 +286,11 @@
 /* Card Styling */
 .recent-milk-card,
 .page-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--ds-surface-strong);
+  border-radius: var(--ds-radius-lg);
   padding: 32px;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 10px 30px rgba(77, 97, 63, 0.08);
+  border: 1px solid var(--ds-border);
+  box-shadow: var(--ds-shadow-sm);
   margin-bottom: 24px;
 }
 

@@ -22,6 +22,20 @@ const paymentSchema = new mongoose.Schema({
     default: 50,
     min: [0, "Price per litre cannot be negative"],
   },
+  // Current-month milk charges (before previous balance is added).
+  milkCharges: {
+    type: Number,
+    default: 0,
+    min: [0, "Milk charges cannot be negative"],
+  },
+  // Outstanding balance carried forward from earlier (unpaid) bills.
+  previousBalance: {
+    type: Number,
+    default: 0,
+    min: [0, "Previous balance cannot be negative"],
+  },
+  // Final payable = milkCharges + previousBalance. Kept for backward
+  // compatibility with existing billTotal/pending calculations.
   totalAmount: {
     type: Number,
     required: [true, "Total amount is required"],
@@ -40,6 +54,15 @@ const paymentSchema = new mongoose.Schema({
     default: 0,
     min: [0, "Pending amount cannot be negative"],
   },
+  // Full payment history against this bill. Each entry is one recorded payment.
+  // This preserves the actual payment records and allows multiple payments.
+  payments: [
+    {
+      amount: { type: Number, required: true, default: 0, min: 0 },
+      date: { type: Date, default: Date.now },
+      note: { type: String, default: "" },
+    },
+  ],
 }, { timestamps: true });
 
 // Indexes for efficient querying

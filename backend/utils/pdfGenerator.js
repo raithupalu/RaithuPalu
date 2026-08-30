@@ -190,14 +190,76 @@ function generateInvoicePDF(filePath, data) {
         .text(formatCurrency(data.pricePerLitre || 0), totalsValue, yPos, { align: 'right' });
       yPos += 25;
 
+            // ---- Amount breakdown: Milk Charges + Previous Balance = Total Bill Amount ----
+      const milkCharges = Number(data.milkCharges ?? data.totalAmount ?? 0);
+      const previousBalance = Number(data.previousBalance ?? 0);
+      const totalBill = Number(data.totalAmount ?? (milkCharges + previousBalance));
+      const totalPaid = Number(data.paid || 0);
+      const remaining = Number(data.pending != null ? data.pending : Math.max(0, totalBill - totalPaid));
+
+      const statusText =
+        remaining <= 0.001
+          ? "PAID"
+          : totalPaid > 0
+            ? "PARTIALLY PAID"
+            : "PENDING";
+
       doc.moveTo(leftMargin, yPos).lineTo(rightMargin, yPos)
         .strokeColor('#1a365d').lineWidth(2).stroke();
-      yPos += 15;
+      yPos += 16;
 
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#1a365d')
-        .text('Total Amount:', totalsCol, yPos);
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#1a365d')
-        .text(formatCurrency(data.totalAmount), totalsValue, yPos, { align: 'right' });
+      // Section heading
+      doc.fontSize(sectionFontSize).font('Helvetica-Bold').fillColor('#1a365d')
+        .text('BILL SUMMARY', leftMargin, yPos);
+      yPos += 20;
+
+      doc.fontSize(bodyFontSize).font('Helvetica').fillColor('#000')
+        .text('Milk Charges:', totalsCol, yPos);
+      doc.fontSize(bodyFontSize).font('Helvetica-Bold').fillColor('#000')
+        .text(formatCurrency(milkCharges), totalsValue, yPos, { align: 'right' });
+      yPos += 18;
+
+      doc.fontSize(bodyFontSize).font('Helvetica').fillColor('#000')
+        .text('Previous Balance:', totalsCol, yPos);
+      doc.fontSize(bodyFontSize).font('Helvetica-Bold').fillColor('#000')
+        .text(formatCurrency(previousBalance), totalsValue, yPos, { align: 'right' });
+      yPos += 18;
+
+      // Total Bill Amount (highlighted)
+      doc.moveTo(leftMargin, yPos).lineTo(rightMargin, yPos)
+        .strokeColor('#e2e8f0').lineWidth(1).stroke();
+      yPos += 14;
+
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#1a365d')
+        .text('Total Bill Amount:', totalsCol, yPos);
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#1a365d')
+        .text(formatCurrency(totalBill), totalsValue, yPos, { align: 'right' });
+      yPos += 20;
+
+      // Payment status breakdown
+      doc.fontSize(bodyFontSize).font('Helvetica').fillColor('#000')
+        .text('Amount Paid:', totalsCol, yPos);
+      doc.fontSize(bodyFontSize).font('Helvetica-Bold').fillColor('#15803d')
+        .text(formatCurrency(totalPaid), totalsValue, yPos, { align: 'right' });
+      yPos += 18;
+
+      doc.fontSize(bodyFontSize).font('Helvetica').fillColor('#000')
+        .text('Remaining Balance:', totalsCol, yPos);
+      doc.fontSize(bodyFontSize).font('Helvetica-Bold').fillColor(
+        remaining > 0.001 ? '#b45309' : '#15803d'
+      ).text(formatCurrency(remaining), totalsValue, yPos, { align: 'right' });
+      yPos += 20;
+
+      // Status line
+      doc.moveTo(leftMargin, yPos).lineTo(rightMargin, yPos)
+        .strokeColor('#e2e8f0').lineWidth(1).stroke();
+      yPos += 14;
+
+      doc.fontSize(bodyFontSize).font('Helvetica').fillColor('#555')
+        .text('Status:', totalsCol, yPos);
+      doc.fontSize(bodyFontSize).font('Helvetica-Bold').fillColor(
+        statusText === 'PAID' ? '#15803d' : statusText === 'PARTIALLY PAID' ? '#b45309' : '#b91c1c'
+      ).text(statusText, totalsValue, yPos, { align: 'right' });
 
       // ============ FOOTER ============
       doc.addPage();

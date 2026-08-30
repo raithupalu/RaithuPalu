@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FormInput from '../FormInput';
+import './MilkEntryForm.css';
 
 // ─────────────────────────────────────────────
-// CustomerSelect — custom SEARCHABLE dropdown.
+// SearchableCustomerSelect — custom SEARCHABLE dropdown.
 //
 // Deliberately NOT a native <select>. A native select uses browser type-ahead
 // (typing "p" jumps straight to the first name starting with "p"), which is
@@ -12,11 +13,21 @@ import FormInput from '../FormInput';
 // filtered result to select it.
 //
 // Two independent states:
-//   - `value` (controlled from parent formData.userId)  → the SELECTED customer.
-//   - `search` (local)                                  → the text being typed.
-// Typing updates `search` only. Clicking a result updates `value`.
+//   - `value`  (controlled from the parent)  → the SELECTED customer.
+//   - `search` (local)                       → the text being typed.
+// Typing updates `search` only. Clicking a result calls `onChange(id)`.
+//
+// This single component is reused by the "Add Milk Entry" form and the
+// "Generate Bill" section so both behave and look identical.
 // ─────────────────────────────────────────────
-export const CustomerSelect = ({ value, onChange, users = [], error }) => {
+export const SearchableCustomerSelect = ({
+  value,
+  onChange,
+  users = [],
+  error,
+  label = 'Customer',
+  placeholder = 'Select Customer',
+}) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -53,14 +64,14 @@ export const CustomerSelect = ({ value, onChange, users = [], error }) => {
   }, [open]);
 
   const handleSelect = (id) => {
-    onChange('userId', id); // set the selected customer
-    setOpen(false);         // close the dropdown
-    setSearch('');          // reset search for next open
+    if (onChange) onChange(id); // set the selected customer
+    setOpen(false);             // close the dropdown
+    setSearch('');              // reset search for next open
   };
 
   return (
     <div className="form-input-wrapper customer-select-wrapper" ref={containerRef}>
-      <label className="form-input-label">Customer</label>
+      <label className="form-input-label">{label}</label>
 
       {/* Trigger / selected value display */}
       <button
@@ -71,7 +82,7 @@ export const CustomerSelect = ({ value, onChange, users = [], error }) => {
         aria-expanded={open}
       >
         <span className="customer-select-trigger-text">
-          {selectedUser ? customerLabel(selectedUser) : 'Select Customer'}
+          {selectedUser ? customerLabel(selectedUser) : placeholder}
         </span>
         <span className="customer-select-caret">▼</span>
       </button>
@@ -131,6 +142,22 @@ export const CustomerSelect = ({ value, onChange, users = [], error }) => {
     </div>
   );
 };
+
+// ─────────────────────────────────────────────
+// CustomerSelect — thin wrapper used by the "Add Milk Entry" form.
+// Maps the reusable component's onChange(id) to the form's onChange(name, value)
+// so the Milk Entry form keeps its exact existing behaviour.
+// ─────────────────────────────────────────────
+export const CustomerSelect = ({ value, onChange, users = [], error }) => (
+  <SearchableCustomerSelect
+    value={value}
+    onChange={(id) => onChange('userId', id)}
+    users={users}
+    error={error}
+    label="Customer"
+    placeholder="Select Customer"
+  />
+);
 
 export const SessionSelect = ({ value, onChange, error }) => (
   <FormInput
