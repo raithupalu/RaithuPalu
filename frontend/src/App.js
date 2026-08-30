@@ -31,6 +31,7 @@ const MilkView = React.lazy(() => import('./pages/customer/MilkView'));
 const CustomerOrders = React.lazy(() => import('./pages/customer/Orders'));
 const CustomerPayments = React.lazy(() => import('./pages/customer/Payments'));
 const ChartPage = React.lazy(() => import('./pages/customer/Chart'));
+const ProfilePage = React.lazy(() => import('./pages/customer/Profile'));
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
@@ -112,6 +113,7 @@ const App = () => {
             <Route path="orders" element={<CustomerOrders />} />
             <Route path="payments" element={<CustomerPayments />} />
             <Route path="chart" element={<ChartPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -137,6 +137,7 @@ const authorizeRoles = require("./middleware/roleMiddleware");
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/milk", require("./routes/milkRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/profile", protect, require("./routes/profileRoutes"));
 app.use("/api/notifications", protect, require("./routes/notificationRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/pdf", require("./routes/pdfRoutes"));

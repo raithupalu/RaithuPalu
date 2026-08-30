@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Button from './Button';
 import ThemeToggle from './ThemeToggle';
+import InstallAppButton from './InstallAppButton';
 import './Navigation.css';
 
 const Navigation = ({ isAuthenticated, onLogout }) => {
@@ -77,6 +78,7 @@ const Navigation = ({ isAuthenticated, onLogout }) => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.5, duration: 0.6 }}
           >
+            <InstallAppButton />
             <ThemeToggle />
             {isAuthenticated ? (
               <>
@@ -109,8 +111,12 @@ const Navigation = ({ isAuthenticated, onLogout }) => {
           </motion.div>
         </div>
 
-        {/* Mobile Header Right Panel (ThemeToggle is retained, hamburger is hidden) */}
+        {/* Mobile Header Right Panel (ThemeToggle & Install App button are active) */}
+        {/* No inline display override — visibility is controlled purely by the
+            CSS media query so this panel only renders on mobile and never
+            duplicates the desktop theme toggle. */}
         <div className="nav-actions-mobile-only">
+          <InstallAppButton />
           <ThemeToggle />
         </div>
       </div>

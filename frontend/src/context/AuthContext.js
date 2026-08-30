@@ -59,9 +59,23 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  // Merge updated fields into the stored + in-memory user object after a
+  // successful profile save, so the UI reflects changes without a relogin.
+  const updateUser = useCallback((updates) => {
+    setUser((prev) => {
+      const next = { ...(prev || {}), ...updates };
+      try {
+        localStorage.setItem('user', JSON.stringify(next));
+      } catch {
+        /* storage unavailable — in-memory state still updates */
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ user, login, register, logout, loading }),
-    [user, login, register, logout, loading]
+    () => ({ user, login, register, logout, updateUser, loading }),
+    [user, login, register, logout, updateUser, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

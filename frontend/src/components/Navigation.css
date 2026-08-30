@@ -175,6 +175,7 @@
   .nav-actions-mobile-only {
     display: flex;
     align-items: center;
+    gap: 10px;
   }
 
   .navigation.menu-open ~ .nav-menu-mobile {

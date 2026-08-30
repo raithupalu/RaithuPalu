@@ -77,6 +77,12 @@ export const authService = {
   register: (data) => api.post('/api/auth/register', data),
 };
 
+export const profileService = {
+  get: () => api.get('/api/profile'),
+  update: (data) => api.put('/api/profile', data),
+  changePassword: (data) => api.put('/api/profile/password', data),
+};
+
 export const milkService = {
   getAll: (params = {}) => api.get('/api/milk', { params }),
   getMyMilk: () => api.get('/api/milk/my'),

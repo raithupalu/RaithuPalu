@@ -61,6 +61,7 @@ const MobileBottomNav = ({ role = 'admin' }) => {
     { path: '/admin/broadcast', icon: FiMessageSquare, labelKey: 'broadcaster' },
   ] : [
     { path: '/customer/chart', icon: FiBox, labelKey: 'analytics' },
+    { path: '/customer/profile', icon: FiUser, labelKey: 'profile' },
   ];
 
   const handleMoreClick = () => {

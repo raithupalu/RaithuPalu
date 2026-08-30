@@ -15,7 +15,8 @@ import {
   FiDollarSign,
   FiActivity,
   FiLogOut,
-  FiMessageSquare
+  FiMessageSquare,
+  FiUser
 } from 'react-icons/fi';
 
 export const menuConfig = {
@@ -35,6 +36,7 @@ export const menuConfig = {
     { path: '/customer/orders', icon: FiBox, label: 'Orders', labelKey: 'orders' },
     { path: '/customer/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
     { path: '/customer/chart', icon: FiBox, label: 'Analytics', labelKey: 'analytics' },
+    { path: '/customer/profile', icon: FiUser, label: 'Profile', labelKey: 'profile' },
   ],
 };
 
