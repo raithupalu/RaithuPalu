@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../../lib/apiNormalize';
 import { PageLoading, PageError } from '../../components/PageState';
 import PageHeader from '../../components/PageHeader';
 import Button from '../../components/Button';
+import EmailVerificationCard from '../../components/EmailVerificationCard';
 import { FiUser, FiMail, FiPhone, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
 import './CustomerPages.css';
 
@@ -81,7 +82,7 @@ const ProfilePage = () => {
   });
 
   // ── Personal info form state ──
-  const [form, setForm] = useState({ username: '', email: '', phone: '' });
+  const [form, setForm] = useState({ username: '', phone: '' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [editing, setEditing] = useState(false);
   const [infoMsg, setInfoMsg] = useState(null);
@@ -91,7 +92,6 @@ const ProfilePage = () => {
     if (data) {
       setForm({
         username: data.username || '',
-        email: data.email || '',
         phone: data.phone || '',
       });
     }
@@ -147,7 +147,6 @@ const ProfilePage = () => {
     e.preventDefault();
     const errors = {
       username: validators.username(form.username),
-      email: validators.email(form.email),
       phone: validators.phone(form.phone),
     };
     const hasErrors = Object.values(errors).some(Boolean);
@@ -155,7 +154,6 @@ const ProfilePage = () => {
     if (hasErrors) return;
     updateMutation.mutate({
       username: form.username.trim(),
-      email: form.email.trim() || null,
       phone: form.phone.trim() || null,
     });
   };
@@ -165,7 +163,6 @@ const ProfilePage = () => {
     if (data) {
       setForm({
         username: data.username || '',
-        email: data.email || '',
         phone: data.phone || '',
       });
     }
@@ -227,6 +224,18 @@ const ProfilePage = () => {
     >
       <PageHeader title="My Profile" subtitle="View and manage your personal account information." />
 
+      {/* ─────────── Email Verification ─────────── */}
+      <motion.section className="page-card" style={{ padding: '24px' }}>
+        <EmailVerificationCard
+          email={data.email || ''}
+          emailVerified={Boolean(data.emailVerified)}
+          onVerified={(updated) => {
+            refetch();
+            updateUser({ email: updated.email, emailVerified: updated.emailVerified });
+          }}
+        />
+      </motion.section>
+
       {/* ─────────── Personal Information ─────────── */}
       <motion.section className="page-card" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -264,20 +273,6 @@ const ProfilePage = () => {
                 placeholder="Your username"
               />
               <FieldError error={fieldErrors.username} />
-            </div>
-
-            <div className="form-group-custom">
-              <label className="form-label-custom">Email</label>
-              <input
-                className="form-input-custom"
-                type="email"
-                value={form.email}
-                disabled={!editing}
-                onChange={(e) => handleFieldChange('email', e.target.value)}
-                style={inputStyle}
-                placeholder="you@example.com"
-              />
-              <FieldError error={fieldErrors.email} />
             </div>
 
             <div className="form-group-custom">

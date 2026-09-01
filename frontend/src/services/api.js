@@ -83,6 +83,12 @@ export const profileService = {
   changePassword: (data) => api.put('/api/profile/password', data),
 };
 
+export const emailVerifyService = {
+  sendOtp: (email) => api.post('/api/email/verify/send', { email }),
+  confirmOtp: (otp) => api.post('/api/email/verify/confirm', { otp }),
+  resendOtp: (email) => api.post('/api/email/verify/resend', { email }),
+};
+
 export const milkService = {
   getAll: (params = {}) => api.get('/api/milk', { params }),
   getMyMilk: () => api.get('/api/milk/my'),

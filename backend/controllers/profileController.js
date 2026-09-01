@@ -27,6 +27,8 @@ const safeUser = (user) => ({
   id: user._id,
   username: user.username,
   email: user.email || null,
+  emailVerified: Boolean(user.emailVerified),
+  pendingEmail: user.pendingEmail || null,
   phone: user.phone || null,
   role: user.role,
 });
@@ -80,20 +82,6 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // ── Sanitize email (optional but validated) ──
-    let cleanEmail;
-    if (email !== undefined && email !== null && String(email).trim() !== "") {
-      cleanEmail = String(email).toLowerCase().trim();
-      if (cleanEmail.length > MAX_INPUT_LENGTH) {
-        return res.status(400).json({ message: "Input exceeds maximum allowed length." });
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-        return res.status(400).json({ message: "Please provide a valid email address." });
-      }
-    } else {
-      cleanEmail = null; // allow clearing email
-    }
-
     // ── Sanitize phone ──
     let cleanPhone;
     if (phone !== undefined && phone !== null && String(phone).trim() !== "") {
@@ -111,9 +99,6 @@ exports.updateProfile = async (req, res) => {
     if (cleanUsername !== undefined && cleanUsername !== existingUser.username) {
       checks.push(User.findOne({ username: cleanUsername, _id: { $ne: existingUser._id } }));
     }
-    if (cleanEmail !== null && cleanEmail !== existingUser.email) {
-      checks.push(User.findOne({ email: cleanEmail, _id: { $ne: existingUser._id } }));
-    }
     if (cleanPhone !== null && cleanPhone !== existingUser.phone) {
       checks.push(User.findOne({ phone: cleanPhone, _id: { $ne: existingUser._id } }));
     }
@@ -121,14 +106,16 @@ exports.updateProfile = async (req, res) => {
     if (checks.length > 0) {
       const results = await Promise.all(checks);
       if (results.some(Boolean)) {
-        return res.status(409).json({ message: "Username, email or phone is already registered." });
+        return res.status(409).json({ message: "Username or phone is already registered." });
       }
     }
 
     // ── Update only intended fields (mass-assignment protection) ──
+    // Email is intentionally NOT updated here — it is changed exclusively through
+    // the OTP verification flow (see emailVerificationController), so an
+    // unverified email can never become a trusted account email.
     const updateFields = {};
     if (cleanUsername !== undefined) updateFields.username = cleanUsername;
-    if (email !== undefined) updateFields.email = cleanEmail;
     if (phone !== undefined) updateFields.phone = cleanPhone;
 
     if (Object.keys(updateFields).length === 0) {

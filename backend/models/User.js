@@ -31,6 +31,15 @@ const userSchema = new mongoose.Schema(
       unique: true, // phone is the customer login identifier — must be unique
       index: true,
     },
+        emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    pendingEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
     role: {
       type: String,
       enum: ["admin", "customer"],

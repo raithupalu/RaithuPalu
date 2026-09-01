@@ -158,6 +158,8 @@ app.use("/api/buffalo", protect, authorizeRoles("admin"), require("./routes/buff
 app.use("/api/expenses", protect, authorizeRoles("admin"), require("./routes/expenseRoutes"));
 app.use("/api/users", protect, authorizeRoles("admin"), require("./routes/userRoutes"));
 app.use("/api/subscriptions", require("./routes/subscriptionRoutes"));
+app.use("/api/email", require("./routes/emailRoutes"));
+
 
 // ─────────────────────────────────────────────
 // MULTER (SECURED)
