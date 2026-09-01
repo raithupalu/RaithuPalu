@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD;
 
@@ -16,6 +17,9 @@ function getTransporter() {
       host: "smtp.gmail.com",
       port: 465,
       secure: true,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
       auth: { user: EMAIL_USER, pass: EMAIL_APP_PASSWORD },
     });
     transporterError = null;
@@ -30,10 +34,17 @@ async function sendEmail({ to, subject, text, html }) {
   const activeTransporter = getTransporter();
   if (!activeTransporter) throw new Error(transporterError || "Email service is not configured.");
   if (!to) throw new Error("Recipient email address is required.");
-  return activeTransporter.sendMail({
+  const mailOptions = {
     from: `"RaithuPalu" <${EMAIL_USER}>`,
     to, subject, text, ...(html ? { html } : {}),
-  });
+  };
+  try {
+    return await activeTransporter.sendMail(mailOptions);
+  } catch (error) {
+    transporter = null;
+    transporterError = null;
+    throw error;
+  }
 }
 
 function isEmailConfigured() {
