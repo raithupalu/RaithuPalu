@@ -84,9 +84,9 @@ export const profileService = {
 };
 
 export const emailVerifyService = {
-  sendOtp: (email) => api.post('/api/email/verify/send', { email }),
+  sendOtp: (email) => api.post('/api/email/verify/send', { email }, { timeout: 30000 }),
   confirmOtp: (otp) => api.post('/api/email/verify/confirm', { otp }),
-  resendOtp: (email) => api.post('/api/email/verify/resend', { email }),
+  resendOtp: (email) => api.post('/api/email/verify/resend', { email }, { timeout: 30000 }),
 };
 
 export const milkService = {

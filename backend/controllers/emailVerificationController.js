@@ -38,8 +38,12 @@ exports.sendOtp = async (req, res, next) => {
 
     const existingWithEmail = await User.findOne({ email, _id: { $ne: customer._id } });
     if (existingWithEmail) { const err = new Error("This email is already associated with another account."); err.status = 409; throw err; }
-
-    const prior = await EmailVerification.findOne({ customerId: customer._id, pendingEmail: email, consumed: false });
+const prior = await EmailVerification.findOne({
+  customerId: customer._id,
+  pendingEmail: email, // (sendOtp) / pendingEmail (resendOtp)
+  consumed: false,
+  expiresAt: { $gt: new Date() },   // ← ADD THIS
+});
     if (prior && Date.now() - new Date(prior.lastRequestedAt).getTime() < RESEND_COOLDOWN_MS) {
       const wait = Math.ceil((RESEND_COOLDOWN_MS - (Date.now() - new Date(prior.lastRequestedAt).getTime())) / 1000);
       const err = new Error(`Please wait ${wait} seconds before requesting another code.`); err.status = 429; throw err;
