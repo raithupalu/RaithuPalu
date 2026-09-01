@@ -30,13 +30,15 @@ const FloatingElement = ({ delay, emoji, x, y }) => (
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [formData, setFormData] = useState({ username: '', password: '' });
+  const [formData, setFormData] = useState({ phone: '', password: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    const digits = formData.phone.replace(/\D/g, '');
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    else if (digits.length < 10) newErrors.phone = 'Please enter a valid phone number';
     if (!formData.password) newErrors.password = 'Password is required';
     else if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
     return newErrors;
@@ -52,7 +54,7 @@ const Login = () => {
     setLoading(true);
     setErrors({});
     try {
-      const userData = await login(formData.username.trim(), formData.password);
+      const userData = await login(formData.phone.trim(), formData.password);
       navigate(userData.role === 'admin' ? '/admin' : '/customer', { replace: true });
     } catch (error) {
       setErrors({ submit: error.message || 'Login failed' });
@@ -103,17 +105,18 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="auth-form" noValidate>
             <motion.div variants={itemVariants}>
               <FormInput
-                label="Username"
-                type="text"
-                autoComplete="username"
-                placeholder="Your username"
-                value={formData.username}
+                label="Phone Number"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="Your phone number"
+                value={formData.phone}
                 onChange={(e) => {
-                  setFormData({ ...formData, username: e.target.value });
-                  if (errors.username) setErrors({ ...errors, username: '' });
+                  setFormData({ ...formData, phone: e.target.value });
+                  if (errors.phone) setErrors({ ...errors, phone: '' });
                 }}
-                error={errors.username}
-                icon="👤"
+                error={errors.phone}
+                icon="📱"
                 required
               />
             </motion.div>
@@ -151,7 +154,7 @@ const Login = () => {
                 variant="primary" 
                 size="lg" 
                 type="submit" 
-                disabled={loading || !formData.username || !formData.password} 
+                disabled={loading || !formData.phone || !formData.password} 
                 className="auth-submit-btn"
               >
                 {loading ? 'Signing in…' : 'Sign in'}

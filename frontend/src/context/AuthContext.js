@@ -30,10 +30,9 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = useCallback(async (username, password, email) => {
-    const data = username ? { username, password } : { email, password };
+  const login = useCallback(async (phone, password) => {
     try {
-      const response = await api.post('/api/auth/login', data);
+      const response = await api.post('/api/auth/login', { phone, password });
       const { token, user: userData } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
