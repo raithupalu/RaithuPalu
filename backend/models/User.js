@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true, // Allow null but enforce uniqueness when present
       lowercase: true,
-      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, "Please provide valid email"],
+      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.[a-zA-Z]{2,3})+$/, "Please provide valid email"],
     },
     password: {
       type: String,
@@ -28,6 +28,8 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       sparse: true,
+      unique: true, // phone is the customer login identifier — must be unique
+      index: true,
     },
     role: {
       type: String,

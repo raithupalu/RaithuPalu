@@ -228,6 +228,18 @@ connectDB().then(async () => {
       }
     }
 
+    // Ensure the admin account has a phone number so phone-based login works
+    // for administrators too. Uses ADMIN_PHONE env if set, else a safe default.
+    // Only sets the phone when missing — never overwrites an existing one.
+    const adminAccount = await User.findOne({ role: "admin" });
+    if (adminAccount && !adminAccount.phone) {
+      const adminPhone = (process.env.ADMIN_PHONE || "9441609701").replace(/\D/g, "").slice(-10);
+      if (adminPhone) {
+        await User.updateOne({ _id: adminAccount._id }, { $set: { phone: adminPhone } });
+        console.log(`Admin phone number configured: ${adminPhone}`);
+      }
+    }
+
     const PORT = process.env.PORT || 5000;
 
     const startServer = (port) => {
