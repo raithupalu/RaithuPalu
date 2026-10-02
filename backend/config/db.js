@@ -12,6 +12,27 @@ const MONGO_OPTIONS = {
   connectTimeoutMS: 10000,         // Timeout for initial connection attempt
 };
 
+const getMongoUri = () => {
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    console.error("FATAL: MONGODB_URI is not defined in environment variables. Legacy MONGO_URI is also missing.");
+    process.exit(1);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    const databaseName = mongoUri.split("/").pop().split("?")[0];
+    const normalizedDatabaseName = String(databaseName || "").trim();
+
+    if (!normalizedDatabaseName || normalizedDatabaseName.toLowerCase() === "test") {
+      console.error("FATAL: Production MongoDB URI is invalid or points to /test. Set MONGODB_URI to the existing raithuPalu database.");
+      process.exit(1);
+    }
+  }
+
+  return mongoUri;
+};
+
 // ─────────────────────────────────────────────
 // Connection Event Handlers
 // FIX: Monitor DB health throughout app lifetime, not just at startup
@@ -50,17 +71,13 @@ const registerMongooseEvents = () => {
 // Connect Function
 // ─────────────────────────────────────────────
 const connectDB = async () => {
-  // FIX: Validate MONGO_URI early with a clear error message
-  if (!process.env.MONGO_URI) {
-    console.error("FATAL: MONGO_URI is not defined in environment variables.");
-    process.exit(1);
-  }
+  const mongoUri = getMongoUri();
 
   // Register events only once before connecting
   registerMongooseEvents();
 
   try {
-    await mongoose.connect(process.env.MONGO_URI, MONGO_OPTIONS);
+    await mongoose.connect(mongoUri, MONGO_OPTIONS);
     // FIX: 'connected' event above handles the success log with host info
   } catch (error) {
     console.error("MongoDB initial connection failed ❌:", error.message);
