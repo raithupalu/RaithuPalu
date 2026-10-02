@@ -43,6 +43,29 @@ const AdminDashboard = () => {
     }
   };
 
+  const milkPreview = React.useMemo(() => data?.milkPreview ?? [], [data?.milkPreview]);
+  const usersPreview = React.useMemo(() => data?.usersPreview ?? [], [data?.usersPreview]);
+  const paymentsPreview = React.useMemo(() => data?.paymentsPreview ?? [], [data?.paymentsPreview]);
+  const stats = React.useMemo(
+    () => data?.stats ?? { totalCustomers: 0, todayMilk: '0', monthlyRevenue: '0', pendingOrders: 0, totalExpenses: '0' },
+    [data?.stats]
+  );
+  const recentOrders = React.useMemo(() => data?.recentOrders ?? [], [data?.recentOrders]);
+
+  const aiModel = React.useMemo(() => {
+    const productionModel = forecastNextWeek(milkPreview);
+    const churnAnalysis = predictCustomerChurn(usersPreview, milkPreview);
+    const anomalies = detectAnomalies(milkPreview);
+    const revenueModel = forecastRevenue(paymentsPreview);
+
+    return { productionModel, churnAnalysis, anomalies, revenueModel };
+  }, [milkPreview, usersPreview, paymentsPreview]);
+
+  const productionModel = activeTab === 'ai' ? aiModel.productionModel : { forecast: [], trend: 'stable', confidence: 'low', avgDailyQty: 0 };
+  const churnAnalysis = activeTab === 'ai' ? aiModel.churnAnalysis : [];
+  const anomalies = activeTab === 'ai' ? aiModel.anomalies : [];
+  const revenueModel = activeTab === 'ai' ? aiModel.revenueModel : { predictedNextMonth: 0, currentRunRate: 0, deltaPercentage: 0 };
+
   if (isPending) {
     return <DashboardSkeleton />;
   }
@@ -58,15 +81,6 @@ const AdminDashboard = () => {
       </div>
     );
   }
-
-  const { stats, recentOrders, rawData } = data;
-  const { users, milk, payments } = rawData;
-
-  // Run AI / Statistical models
-  const productionModel = forecastNextWeek(milk);
-  const churnAnalysis = predictCustomerChurn(users, milk);
-  const anomalies = detectAnomalies(milk);
-  const revenueModel = forecastRevenue(payments);
 
   return (
     <div className="admin-page">
@@ -244,7 +258,7 @@ const AdminDashboard = () => {
               <span>🔮</span> MilkFlow AI™ Smart Assistant
             </h3>
             <p style={{ margin: 0, color: 'var(--ds-text-muted)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-              Predictive models have analyzed <strong>{milk.length}</strong> milk delivery entries, <strong>{users.length}</strong> user records, and <strong>{payments.length}</strong> billing profiles. 
+              Predictive models have analyzed <strong>{milkPreview.length}</strong> recent milk delivery entries, <strong>{usersPreview.length}</strong> user records, and <strong>{paymentsPreview.length}</strong> billing profiles. 
               The statistics below are calculated dynamically using linear regression, time-series, and activity-drop heuristics.
             </p>
           </motion.section>

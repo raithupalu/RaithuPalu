@@ -15,7 +15,11 @@ const Login = React.lazy(() => import('./pages/auth/Login'));
 const Register = React.lazy(() => import('./pages/auth/Register'));
 const AdminLayout = React.lazy(() => import('./components/AdminLayout'));
 const CustomerLayout = React.lazy(() => import('./components/CustomerLayout'));
+const WorkerLayout = React.lazy(() => import('./components/WorkerLayout'));
 const AdminDashboard = React.lazy(() => import('./pages/admin/Dashboard'));
+const Workers = React.lazy(() => import('./pages/admin/Workers'));
+const WorkerDetails = React.lazy(() => import('./pages/admin/WorkerDetails'));
+const WorkerAttendanceDetails = React.lazy(() => import('./pages/admin/WorkerAttendanceDetails'));
 const MilkEntry = React.lazy(() => import('./pages/admin/MilkEntry'));
 const AdminOrders = React.lazy(() => import('./pages/admin/Orders'));
 const AdminPayments = React.lazy(() => import('./pages/admin/Payments'));
@@ -26,6 +30,9 @@ const BuffaloList = React.lazy(() => import('./pages/admin/BuffaloList'));
 const AddBuffalo = React.lazy(() => import('./pages/admin/Buffalo'));
 const BuffaloDetails = React.lazy(() => import('./pages/admin/BuffaloDetails'));
 const Broadcast = React.lazy(() => import('./pages/admin/Broadcast'));
+const WorkerDashboard = React.lazy(() => import('./pages/worker/Dashboard'));
+const WorkerTasks = React.lazy(() => import('./pages/worker/Tasks'));
+const WorkerProfile = React.lazy(() => import('./pages/worker/Profile'));
 const CustomerDashboard = React.lazy(() => import('./pages/customer/Dashboard'));
 const MilkView = React.lazy(() => import('./pages/customer/MilkView'));
 const CustomerOrders = React.lazy(() => import('./pages/customer/Orders'));
@@ -41,7 +48,9 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   if (!user) return <Navigate to="/login" replace />;
   
   if (allowedRole && user.role !== allowedRole) {
-    return user.role === 'admin' ? <Navigate to="/admin" replace /> : <Navigate to="/customer/dashboard" replace />;
+    if (user.role === 'admin') return <Navigate to="/admin" replace />;
+    if (user.role === 'worker') return <Navigate to="/worker" replace />;
+    return <Navigate to="/customer/dashboard" replace />;
   }
   
   return children;
@@ -98,8 +107,21 @@ const App = () => {
             <Route path="payments" element={<AdminPayments />} />
             <Route path="customers" element={<Customers />} />
             <Route path="customers/:id" element={<CustomerDetails />} />
+            <Route path="workers" element={<Workers />} />
+            <Route path="workers/:id" element={<WorkerDetails />} />
+            <Route path="workers/:workerId/attendance/:date" element={<WorkerAttendanceDetails />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="broadcast" element={<Broadcast />} />
+          </Route>
+
+          <Route path="/worker" element={
+            <ProtectedRoute allowedRole="worker">
+              <WorkerLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<WorkerDashboard />} />
+            <Route path="tasks" element={<WorkerTasks />} />
+            <Route path="profile" element={<WorkerProfile />} />
           </Route>
           
           <Route path="/customer" element={

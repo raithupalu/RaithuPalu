@@ -23,11 +23,12 @@ export const menuConfig = {
   admin: [
     { path: '/admin', icon: FiHome, label: 'Dashboard', labelKey: 'dashboard', exact: true },
     { path: '/admin/milk', icon: FiDroplet, label: 'Milk Entry', labelKey: 'milkEntry' },
-    { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo', labelKey: 'buffalo' },
-    { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses', labelKey: 'expenses' },
+    { path: '/admin/customers', icon: FiUsers, label: 'Customers', labelKey: 'customers' },
+    { path: '/admin/workers', icon: FiUsers, label: 'Workers', labelKey: 'workers' },
     { path: '/admin/orders', icon: FiBox, label: 'Orders', labelKey: 'orders' },
     { path: '/admin/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
-    { path: '/admin/customers', icon: FiUsers, label: 'Customers', labelKey: 'customers' },
+    { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo', labelKey: 'buffalo' },
+    { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses', labelKey: 'expenses' },
     { path: '/admin/broadcast', icon: FiMessageSquare, label: 'Broadcaster', labelKey: 'broadcaster' },
   ],
   customer: [
@@ -37,6 +38,11 @@ export const menuConfig = {
     { path: '/customer/payments', icon: FiCreditCard, label: 'Payments', labelKey: 'payments' },
     { path: '/customer/chart', icon: FiBox, label: 'Analytics', labelKey: 'analytics' },
     { path: '/customer/profile', icon: FiUser, label: 'Profile', labelKey: 'profile' },
+  ],
+  worker: [
+    { path: '/worker', icon: FiHome, label: 'Worker Dashboard', labelKey: 'dashboard', exact: true },
+    { path: '/worker/tasks', icon: FiActivity, label: 'Daily Tasks', labelKey: 'milkEntry' },
+    { path: '/worker/profile', icon: FiUser, label: 'Profile', labelKey: 'profile' },
   ],
 };
 
@@ -162,7 +168,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
               <span style={{ color: theme === 'dark' ? '#22c55e' : '#4caf50' }}>Palu</span>
             </span>
             <p className="sidebar__logo-sub">
-              {role === 'admin' ? 'Admin Panel' : 'Customer Portal'}
+              {role === 'admin' ? 'Admin Panel' : role === 'worker' ? 'Worker Portal' : 'Customer Portal'}
             </p>
           </>
         )}
@@ -224,7 +230,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
               <div className="sidebar__profile-text">
                 <p className="user-text sidebar__profile-name">{user?.username}</p>
                 <p className="user-text sidebar__profile-role">
-                  {role === 'admin' ? 'Administrator' : 'Customer'}
+                  {role === 'admin' ? 'Administrator' : role === 'worker' ? 'Worker' : 'Customer'}
                 </p>
               </div>
             </div>

@@ -8,6 +8,20 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
+  /* ── Typography scale for higher readability and consistent hierarchy ── */
+  --font-body: 'Inter', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --text-body: 1rem;
+  --text-body-lg: 1.125rem;
+  --text-body-sm: 0.875rem;
+  --text-label: 0.8rem;
+  --text-title: clamp(2.1rem, 3vw, 3.25rem);
+  --text-section: clamp(1.5rem, 2.4vw, 2.1rem);
+  --text-subsection: clamp(1.15rem, 1.8vw, 1.5rem);
+  --text-meta: 0.92rem;
+  --leading-body: 1.7;
+  --leading-tight: 1.2;
+
   /* ── Canonical semantic tokens (single source of truth) ── */
   --bg-primary: #F7F5EF;            /* warm off-white page background */
   --bg-secondary: #EFEBE1;          /* slightly deeper warm tone       */

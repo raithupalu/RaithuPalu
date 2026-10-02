@@ -66,9 +66,11 @@ exports.getMyOrders = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const orders = await Order.find({ userId: req.user.id })
+      .select("_id userId quantity time date status deliveryDate createdAt")
       .sort({ date: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await Order.countDocuments({ userId: req.user.id });
 
@@ -93,10 +95,12 @@ exports.getAllOrders = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const orders = await Order.find()
+      .select("_id userId quantity time date status deliveryDate createdAt")
       .populate("userId", "username email phone")
       .sort({ date: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await Order.countDocuments();
 

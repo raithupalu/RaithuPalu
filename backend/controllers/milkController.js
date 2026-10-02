@@ -80,7 +80,12 @@ exports.getMyMilkEntries = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const [entries, total] = await Promise.all([
-      MilkEntry.find({ userId: req.user.id }).sort({ date: -1 }).skip(skip).limit(limit),
+      MilkEntry.find({ userId: req.user.id })
+        .select("_id userId quantity pricePerLitre totalPrice session date entryType notes createdAt updatedAt")
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       MilkEntry.countDocuments({ userId: req.user.id }),
     ]);
 
@@ -115,10 +120,12 @@ exports.getAllMilkEntries = async (req, res, next) => {
 
     const [entries, total] = await Promise.all([
       MilkEntry.find()
+        .select("_id userId quantity pricePerLitre totalPrice session date entryType notes createdAt")
         .populate("userId", "username phone")
         .sort({ date: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       MilkEntry.countDocuments(),
     ]);
 

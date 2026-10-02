@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+// import { motion } from 'framer-motion';
 import Modal from './Modal';
 import { billTotal, amountPaid, amountPending } from '../lib/paymentUtils';
 

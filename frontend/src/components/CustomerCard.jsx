@@ -67,12 +67,14 @@ const CustomerCard = ({ customer, onDelete, isDeleting }) => {
           <h3
             style={{
               margin: 0,
-              fontSize: '1.1rem',
-              fontWeight: 600,
+              fontSize: '1.35rem',
+              fontWeight: 700,
               color: '#1a1a1a',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}
           >
             {customer.username || 'N/A'}
@@ -80,7 +82,7 @@ const CustomerCard = ({ customer, onDelete, isDeleting }) => {
           <p
             style={{
               margin: '4px 0 0',
-              fontSize: '0.85rem',
+              fontSize: '0.92rem',
               color: '#666',
             }}
           >
@@ -93,7 +95,7 @@ const CustomerCard = ({ customer, onDelete, isDeleting }) => {
         style={{
           display: 'flex',
           gap: '16px',
-          fontSize: '0.85rem',
+          fontSize: '0.9rem',
           color: '#555',
         }}
       >

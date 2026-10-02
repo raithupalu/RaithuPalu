@@ -42,7 +42,9 @@ async function executeWithSession(operation, session) {
 // ✅ GET ALL CUSTOMERS (ADMIN ONLY)
 exports.getUsers = async (req, res, next) => {
   try {
-    const users = await User.find({ role: "customer" }).select("-password");
+    const users = await User.find({ role: "customer" })
+      .select("_id username email phone role isActive createdAt")
+      .lean();
     res.json(users);
   } catch (err) {
     next(err);

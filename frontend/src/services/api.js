@@ -6,7 +6,7 @@ const AUTH_PATHS = ['/api/auth/login', '/api/auth/register'];
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -181,6 +181,20 @@ export const pdfService = {
 
 export const notificationService = {
   broadcast: (data) => api.post('/api/notifications/broadcast', data),
+};
+
+export const workerService = {
+  getAll: () => api.get('/api/workers'),
+  create: (data) => api.post('/api/workers', data),
+  delete: (workerId) => api.delete(`/api/workers/${workerId}`),
+  getById: (id) => api.get(`/api/workers/${id}`),
+  getAttendanceByMonth: (id, month) => api.get(`/api/workers/${id}/attendance`, { params: { month } }),
+  getAttendanceByDate: (id, date) => api.get(`/api/workers/${id}/attendance/${date}`),
+  getMyProfile: () => api.get('/api/workers/me'),
+  getMyTasks: () => api.get('/api/workers/me/tasks/today'),
+  submitTask: (taskType, formData) => api.post(`/api/workers/me/tasks/${taskType}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 export const subscriptionService = {

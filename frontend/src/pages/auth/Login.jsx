@@ -55,7 +55,13 @@ const Login = () => {
     setErrors({});
     try {
       const userData = await login(formData.phone.trim(), formData.password);
-      navigate(userData.role === 'admin' ? '/admin' : '/customer', { replace: true });
+      if (userData.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (userData.role === 'worker') {
+        navigate('/worker', { replace: true });
+      } else {
+        navigate('/customer', { replace: true });
+      }
     } catch (error) {
       setErrors({ submit: error.message || 'Login failed' });
     } finally {

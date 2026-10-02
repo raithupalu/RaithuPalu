@@ -50,6 +50,7 @@ app.use(
   })
 );
 app.use("/temp", express.static(path.join(__dirname, "temp")));
+app.use("/uploads", express.static(uploadsDir));
 
 // ─────────────────────────────────────────────
 // MIDDLEWARE
@@ -157,6 +158,7 @@ app.use("/api/pdf", require("./routes/pdfRoutes"));
 app.use("/api/buffalo", protect, authorizeRoles("admin"), require("./routes/buffaloRoutes"));
 app.use("/api/expenses", protect, authorizeRoles("admin"), require("./routes/expenseRoutes"));
 app.use("/api/users", protect, authorizeRoles("admin"), require("./routes/userRoutes"));
+app.use("/api/workers", require("./routes/workerRoutes"));
 app.use("/api/subscriptions", require("./routes/subscriptionRoutes"));
 app.use("/api/email", require("./routes/emailRoutes"));
 
@@ -242,7 +244,10 @@ connectDB().then(async () => {
       }
     }
 
-    const PORT = process.env.PORT || 5000;
+    let PORT = Number(process.env.PORT || 5000);
+    if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+      PORT = 5000;
+    }
 
     const startServer = (port) => {
       const server = app.listen(port, () => {
@@ -251,8 +256,13 @@ connectDB().then(async () => {
 
       server.on("error", (err) => {
         if (err.code === "EADDRINUSE") {
-          console.log(`⚠ Port ${port} busy → trying ${port + 1}`);
-          startServer(port + 1);
+          const nextPort = port + 1;
+          if (nextPort > 65535) {
+            console.error("No free port available after 65535");
+            process.exit(1);
+          }
+          console.log(`⚠ Port ${port} busy → trying ${nextPort}`);
+          startServer(nextPort);
         } else {
           console.error("Server error:", err);
           process.exit(1);

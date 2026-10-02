@@ -184,8 +184,10 @@ exports.generateBill = async (req, res, next) => {
 exports.getMyPayments = async (req, res, next) => {
   try {
     const payments = await Payment.find({ userId: req.user.id })
+      .select("_id userId month totalLitres pricePerLitre milkCharges previousBalance totalAmount paid pending payments createdAt updatedAt")
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(50)
+      .lean();
 
     res.json(payments);
   } catch (error) {
@@ -196,9 +198,11 @@ exports.getMyPayments = async (req, res, next) => {
 exports.getAllPayments = async (req, res, next) => {
   try {
     const payments = await Payment.find()
+      .select("_id userId month totalLitres pricePerLitre milkCharges previousBalance totalAmount paid pending payments createdAt updatedAt")
       .populate("userId", "username email")
       .sort({ createdAt: -1 })
-      .limit(100);
+      .limit(100)
+      .lean();
 
     res.json(payments);
   } catch (error) {

@@ -42,9 +42,11 @@ exports.getExpenses = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const expenses = await Expense.find()
+      .select("_id title amount date createdAt")
       .sort({ date: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await Expense.countDocuments();
 

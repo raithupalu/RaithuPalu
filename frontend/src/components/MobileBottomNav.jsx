@@ -41,28 +41,44 @@ const MobileBottomNav = ({ role = 'admin' }) => {
   };
 
   // 1. Definition of core tab configurations
-  const tabs = role === 'admin' ? [
-    { path: '/admin', icon: FiHome, labelKey: 'dashboard', exact: true },
-    { path: '/admin/milk', icon: FiDroplet, labelKey: 'milkEntry' },
-    { path: '/admin/orders', icon: FiBox, labelKey: 'orders' },
-    { path: '/admin/payments', icon: FiCreditCard, labelKey: 'payments' },
-  ] : [
-    { path: '/customer/dashboard', icon: FiHome, labelKey: 'dashboard' },
-    { path: '/customer/milk', icon: FiDroplet, labelKey: 'milkEntry' },
-    { path: '/customer/orders', icon: FiBox, labelKey: 'orders' },
-    { path: '/customer/payments', icon: FiCreditCard, labelKey: 'payments' },
-  ];
+  const tabs = role === 'admin'
+    ? [
+        { path: '/admin', icon: FiHome, labelKey: 'dashboard', exact: true },
+        { path: '/admin/milk', icon: FiDroplet, labelKey: 'milkEntry' },
+        { path: '/admin/orders', icon: FiBox, labelKey: 'orders' },
+        { path: '/admin/payments', icon: FiCreditCard, labelKey: 'payments' },
+      ]
+    : role === 'worker'
+      ? [
+          { path: '/worker', icon: FiHome, labelKey: 'dashboard', exact: true },
+          { path: '/worker/tasks', icon: FiActivity, labelKey: 'milkEntry' },
+          { path: '/worker/profile', icon: FiUser, labelKey: 'profile' },
+        ]
+      : [
+          { path: '/customer/dashboard', icon: FiHome, labelKey: 'dashboard' },
+          { path: '/customer/milk', icon: FiDroplet, labelKey: 'milkEntry' },
+          { path: '/customer/orders', icon: FiBox, labelKey: 'orders' },
+          { path: '/customer/payments', icon: FiCreditCard, labelKey: 'payments' },
+        ];
 
   // 2. Definition of "More" sheet lists
-  const moreItems = role === 'admin' ? [
-    { path: '/admin/customers', icon: FiUsers, labelKey: 'customers' },
-    { path: '/admin/buffalo', icon: FiActivity, labelKey: 'buffalo' },
-    { path: '/admin/expenses', icon: FiDollarSign, labelKey: 'expenses' },
-    { path: '/admin/broadcast', icon: FiMessageSquare, labelKey: 'broadcaster' },
-  ] : [
-    { path: '/customer/chart', icon: FiBox, labelKey: 'analytics' },
-    { path: '/customer/profile', icon: FiUser, labelKey: 'profile' },
-  ];
+  const moreItems = role === 'admin'
+    ? [
+        { path: '/admin/customers', icon: FiUsers, labelKey: 'customers' },
+        { path: '/admin/workers', icon: FiUsers, labelKey: 'workers' },
+        { path: '/admin/buffalo', icon: FiActivity, labelKey: 'buffalo' },
+        { path: '/admin/expenses', icon: FiDollarSign, labelKey: 'expenses' },
+        { path: '/admin/broadcast', icon: FiMessageSquare, labelKey: 'broadcaster' },
+      ]
+    : role === 'worker'
+      ? [
+          { path: '/worker/tasks', icon: FiActivity, labelKey: 'milkEntry' },
+          { path: '/worker/profile', icon: FiUser, labelKey: 'profile' },
+        ]
+      : [
+          { path: '/customer/chart', icon: FiBox, labelKey: 'analytics' },
+          { path: '/customer/profile', icon: FiUser, labelKey: 'profile' },
+        ];
 
   const handleMoreClick = () => {
     setShowMore(prev => !prev);

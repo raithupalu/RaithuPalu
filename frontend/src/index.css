@@ -11,6 +11,12 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
 html, body {
   height: 100%;
   overflow-x: hidden;
@@ -63,15 +69,43 @@ html, body {
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 1.06rem;
+  line-height: var(--leading-body, 1.7);
+  letter-spacing: 0;
   background: var(--cream-primary);
   color: var(--text-dark);
   overflow-x: hidden;
   overflow-y: auto;
   min-height: 100vh;
-  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+body, input, textarea, select, button {
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: inherit;
+}
+
+body p,
+body li,
+body td,
+body th,
+body span,
+body div,
+body label {
+  font-size: 1.02rem;
+}
+
+label,
+small,
+span,
+p,
+li,
+td,
+th {
+  font-size: inherit;
+  line-height: inherit;
 }
 
 [data-theme="dark"] body::before {
@@ -126,31 +160,80 @@ body,
 /* TYPOGRAPHY SYSTEM     */
 /* ===================== */
 
+:root {
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  line-height: var(--leading-tight, 1.2);
+  color: var(--text-dark);
+  margin: 0 0 0.5em;
 }
 
 h1 {
-  font-size: 3.25rem;
-  line-height: 1.15;
+  font-size: var(--text-title, clamp(2.1rem, 3vw, 3.25rem));
 }
 
 h2 {
-  font-size: 2.1rem;
-  line-height: 1.25;
+  font-size: var(--text-section, clamp(1.5rem, 2.4vw, 2.1rem));
 }
 
 h3 {
-  font-size: 1.4rem;
-  line-height: 1.35;
+  font-size: var(--text-subsection, clamp(1.15rem, 1.8vw, 1.5rem));
+}
+
+h4, h5, h6 {
+  font-size: 1.12rem;
 }
 
 p {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: var(--text-body, 1rem);
+  line-height: var(--leading-body, 1.7);
   color: var(--text-light);
+  margin: 0 0 1em;
+}
+
+strong,
+b,
+mark {
+  font-weight: 700;
+}
+
+small {
+  font-size: var(--text-body-sm, 0.875rem);
+}
+
+label,
+.form-label-base,
+.form-input-label {
+  font-size: var(--text-label, 0.8rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.customer-page *,
+.customer-dashboard *,
+.auth-page *:not(input):not(textarea):not(select):not(button):not(svg) {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.customer-page p,
+.customer-dashboard p,
+.auth-page p {
+  text-transform: none;
+}
+
+.customer-page .chart-bar-label,
+.customer-page .chart-summary-label,
+.customer-page .card-meta-muted,
+.customer-page .stat-label,
+.customer-dashboard .stat-label {
+  text-transform: uppercase;
 }
 
 /* ===================== */

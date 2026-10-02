@@ -5,7 +5,7 @@ import { isoDayPrefix } from '../lib/dates';
 import { amountPaid } from '../lib/paymentUtils';
 
 const DASHBOARD_QUERY_KEY = ['admin', 'dashboard'];
-const DEFAULT_MILK_LIMIT = 2000;
+const DEFAULT_MILK_LIMIT = 250;
 
 async function fetchAdminDashboard() {
   const [usersRes, milkRes, ordersRes, paymentsRes, expensesRes] = await Promise.all([
@@ -47,14 +47,9 @@ async function fetchAdminDashboard() {
       totalExpenses: totalExpenses.toFixed(2),
     },
     recentOrders: orders.slice(0, 8),
-    // Expose raw data arrays to power client-side AI forecasting and statistical models
-    rawData: {
-      users,
-      milk,
-      orders,
-      payments,
-      expenses
-    }
+    milkPreview: milk.slice(-180),
+    usersPreview: users.slice(0, 120),
+    paymentsPreview: payments.slice(0, 120),
   };
 }
 

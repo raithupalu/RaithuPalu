@@ -10,12 +10,18 @@ const userSchema = new mongoose.Schema(
       minlength: [3, "Username must be at least 3 characters"],
       maxlength: [30, "Username cannot exceed 30 characters"],
       lowercase: true,
-      index: true, // Add index for faster queries
+      index: true,
+    },
+    name: {
+      type: String,
+      trim: true,
+      maxlength: [80, "Name cannot exceed 80 characters"],
+      default: "",
     },
     email: {
       type: String,
       unique: true,
-      sparse: true, // Allow null but enforce uniqueness when present
+      sparse: true,
       lowercase: true,
       match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.[a-zA-Z]{2,3})+$/, "Please provide valid email"],
     },
@@ -23,15 +29,21 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: [8, "Password must be at least 8 characters"],
-      select: false, // Don't return password by default
+      select: false,
     },
     phone: {
       type: String,
       sparse: true,
-      unique: true, // phone is the customer login identifier — must be unique
+      unique: true,
       index: true,
     },
-        emailVerified: {
+    workType: {
+      type: String,
+      enum: ["Milk Labour", "Buffalo Keeper"],
+      default: null,
+      index: true,
+    },
+    emailVerified: {
       type: Boolean,
       default: false,
     },
@@ -42,9 +54,9 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "customer"],
+      enum: ["admin", "customer", "worker"],
       default: "customer",
-      index: true, // Add index for faster role-based queries
+      index: true,
     },
     isActive: {
       type: Boolean,
