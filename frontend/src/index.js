@@ -34,15 +34,16 @@ root.render(
   </React.StrictMode>
 );
 
-// Register Progressive Web App (PWA) Service Worker
-// Only register in production builds. During `npm start` (dev) the CRA dev
-// server serves /sw.js as index.html (text/html), which Service Workers
-// reject with a SecurityError. In production it's served with the correct
-// MIME type (application/javascript).
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+// Do not use a service worker for this app. Older cached bundles can survive
+// deployments and cause 404s for hashed JS files after a new release.
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('PWA ServiceWorker registered successfully ✅', reg.scope))
-      .catch(err => console.error('PWA ServiceWorker registration failed ✕', err));
+    navigator.serviceWorker.getRegistrations()
+      .then((registrations) => {
+        registrations.forEach((registration) => registration.unregister());
+      })
+      .catch(() => {
+        // Ignore browser-level service worker errors; the app should still work.
+      });
   });
 }
