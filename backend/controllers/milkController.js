@@ -50,6 +50,7 @@ exports.addMilkEntry = async (req, res, next) => {
 
     const entry = await MilkEntry.create({
       userId,
+      createdBy: req.user.id,
       quantity: q,
       pricePerLitre: price,
       totalPrice,

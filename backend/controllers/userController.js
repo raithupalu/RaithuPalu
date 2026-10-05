@@ -5,6 +5,7 @@ const Order = require("../models/Order");
 const Buffalo = require("../models/Buffalo");
 const Notification = require("../models/Notification");
 const Expense = require("../models/Expense");
+const DeliveryAssignment = require("../models/DeliveryAssignment");
 const mongoose = require("mongoose");
 const { Logger } = require("../utils/logger");
 
@@ -27,6 +28,10 @@ async function deleteCustomerData(userId, session) {
 
     await operation.model.deleteMany({ [operation.field]: userId }, { session });
   }
+
+  await DeliveryAssignment.deleteMany({
+    $or: [{ deliveryManId: userId }, { customerId: userId }],
+  }, { session });
 }
 
 async function executeWithSession(operation, session) {

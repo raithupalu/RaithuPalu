@@ -60,7 +60,7 @@ const protect = async (req, res, next) => {
   // 🔹 DB check
   try {
     const user = await User.findById(userId)
-      .select("_id role username")
+      .select("_id role username deliveryPermissions")
       .lean();
 
     if (!user) {
@@ -75,6 +75,7 @@ const protect = async (req, res, next) => {
       id: user._id,
       role: user.role,
       username: user.username,
+      permissions: Array.isArray(user.deliveryPermissions) ? user.deliveryPermissions : [],
     };
 
     next();

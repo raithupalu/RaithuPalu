@@ -36,7 +36,7 @@ const validatePassword = (password) => {
 // ─────────────────────────────────────────────
 // LOGIN  (phone + password)
 // ─────────────────────────────────────────────
-exports.loginUser = async (req, res) => {
+const authenticateUser = async (req, res) => {
   try {
     const { phone, username, email, password } = req.body;
 
@@ -84,7 +84,11 @@ exports.loginUser = async (req, res) => {
     const passwordToCompare = userDoc?.password || dummyHash;
     const isMatch = await bcrypt.compare(String(password), String(passwordToCompare));
 
-    if (!userDoc || !isMatch) {
+    if (
+      !userDoc ||
+      !isMatch ||
+      userDoc.isActive === false
+    ) {
       console.warn(
         `[AUTH] Failed login attempt — ${identifierLabel} — IP: ${req.ip} — ${new Date().toISOString()}`
       );
@@ -119,6 +123,8 @@ exports.loginUser = async (req, res) => {
     return res.status(500).json({ message: "Server error. Please try again later." });
   }
 };
+
+exports.loginUser = (req, res) => authenticateUser(req, res);
 
 // ─────────────────────────────────────────────
 // REGISTER

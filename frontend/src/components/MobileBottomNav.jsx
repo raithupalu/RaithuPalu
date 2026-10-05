@@ -54,7 +54,12 @@ const MobileBottomNav = ({ role = 'admin' }) => {
         { path: '/admin/workers', icon: FiBriefcase, labelKey: 'workers' },
         { path: '/admin/orders', icon: FiBox, labelKey: 'orders' },
       ]
-    : role === 'worker'
+    : role === 'milk_delivery_man'
+      ? [
+          { path: '/delivery', icon: FiHome, labelKey: 'customers' },
+          { path: '/delivery/milk', icon: FiDroplet, labelKey: 'milkEntry' },
+        ]
+      : role === 'worker'
       ? [
           { path: '/worker', icon: FiHome, labelKey: 'dashboard', exact: true },
           { path: '/worker/tasks', icon: FiActivity, labelKey: 'milkEntry' },
@@ -76,7 +81,9 @@ const MobileBottomNav = ({ role = 'admin' }) => {
         { path: '/admin/expenses', icon: FiDollarSign, labelKey: 'expenses' },
         { path: '/admin/broadcast', icon: FiMessageSquare, labelKey: 'broadcaster' },
       ]
-    : role === 'worker'
+    : role === 'milk_delivery_man'
+      ? []
+      : role === 'worker'
       ? [
           { path: '/worker/tasks', icon: FiActivity, labelKey: 'milkEntry' },
           { path: '/worker/profile', icon: FiUser, labelKey: 'profile' },

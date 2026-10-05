@@ -16,7 +16,8 @@ import {
   FiActivity,
   FiLogOut,
   FiMessageSquare,
-  FiUser
+  FiUser,
+  FiTruck
 } from 'react-icons/fi';
 
 export const menuConfig = {
@@ -30,6 +31,7 @@ export const menuConfig = {
     { path: '/admin/buffalo', icon: FiActivity, label: 'Buffalo', labelKey: 'buffalo' },
     { path: '/admin/expenses', icon: FiDollarSign, label: 'Expenses', labelKey: 'expenses' },
     { path: '/admin/broadcast', icon: FiMessageSquare, label: 'Broadcaster', labelKey: 'broadcaster' },
+    { path: '/admin/delivery-access', icon: FiTruck, label: 'Milk Delivery Access', labelKey: 'deliveryAccess' },
   ],
   customer: [
     { path: '/customer/dashboard', icon: FiHome, label: 'My Dashboard', labelKey: 'dashboard' },
@@ -43,6 +45,10 @@ export const menuConfig = {
     { path: '/worker', icon: FiHome, label: 'Worker Dashboard', labelKey: 'dashboard', exact: true },
     { path: '/worker/tasks', icon: FiActivity, label: 'Daily Tasks', labelKey: 'milkEntry' },
     { path: '/worker/profile', icon: FiUser, label: 'Profile', labelKey: 'profile' },
+  ],
+  milk_delivery_man: [
+    { path: '/delivery', icon: FiHome, label: 'Customers', labelKey: 'customers' },
+    { path: '/delivery/milk', icon: FiDroplet, label: 'Milk History', labelKey: 'milkEntry' },
   ],
 };
 
@@ -168,7 +174,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
               <span style={{ color: theme === 'dark' ? '#22c55e' : '#4caf50' }}>Palu</span>
             </span>
             <p className="sidebar__logo-sub">
-              {role === 'admin' ? 'Admin Panel' : role === 'worker' ? 'Worker Portal' : 'Customer Portal'}
+              {role === 'admin' ? 'Admin Panel' : role === 'worker' ? 'Worker Portal' : role === 'milk_delivery_man' ? 'Delivery Portal' : 'Customer Portal'}
             </p>
           </>
         )}
@@ -230,7 +236,7 @@ const Sidebar = ({ role = 'admin', theme = 'light', collapsed = false, isMobile 
               <div className="sidebar__profile-text">
                 <p className="user-text sidebar__profile-name">{user?.username}</p>
                 <p className="user-text sidebar__profile-role">
-                  {role === 'admin' ? 'Administrator' : role === 'worker' ? 'Worker' : 'Customer'}
+                  {role === 'admin' ? 'Administrator' : role === 'worker' ? 'Worker' : role === 'milk_delivery_man' ? 'Milk Delivery Man' : 'Customer'}
                 </p>
               </div>
             </div>

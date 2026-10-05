@@ -8,10 +8,11 @@ const {
 } = require("../controllers/userController");
 
 const auth = require("../middleware/authMiddleware");
+const authorizeRoles = require("../middleware/roleMiddleware");
 
 // Admin routes
-router.get("/", auth, getUsers);
+router.get("/", auth, authorizeRoles("admin"), getUsers);
 router.get("/:id", auth, getUserById);
-router.delete("/:id", auth, deleteUser);
+router.delete("/:id", auth, authorizeRoles("admin"), deleteUser);
 
 module.exports = router;

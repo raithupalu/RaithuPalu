@@ -57,6 +57,8 @@ const Login = () => {
       const userData = await login(formData.phone.trim(), formData.password);
       if (userData.role === 'admin') {
         navigate('/admin', { replace: true });
+      } else if (userData.role === 'milk_delivery_man') {
+        navigate('/delivery', { replace: true });
       } else if (userData.role === 'worker') {
         navigate('/worker', { replace: true });
       } else {
@@ -171,9 +173,7 @@ const Login = () => {
           <motion.div variants={itemVariants} className="auth-footer">
             <p>
               No account?{' '}
-              <Link to="/register" className="auth-link">
-                Create one
-              </Link>
+              <Link to="/register" className="auth-link">Create one</Link>
             </p>
           </motion.div>
         </motion.div>

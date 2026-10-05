@@ -16,6 +16,7 @@ const Register = React.lazy(() => import('./pages/auth/Register'));
 const AdminLayout = React.lazy(() => import('./components/AdminLayout'));
 const CustomerLayout = React.lazy(() => import('./components/CustomerLayout'));
 const WorkerLayout = React.lazy(() => import('./components/WorkerLayout'));
+const DeliveryLayout = React.lazy(() => import('./components/DeliveryLayout'));
 const AdminDashboard = React.lazy(() => import('./pages/admin/Dashboard'));
 const Workers = React.lazy(() => import('./pages/admin/Workers'));
 const WorkerDetails = React.lazy(() => import('./pages/admin/WorkerDetails'));
@@ -39,16 +40,26 @@ const CustomerOrders = React.lazy(() => import('./pages/customer/Orders'));
 const CustomerPayments = React.lazy(() => import('./pages/customer/Payments'));
 const ChartPage = React.lazy(() => import('./pages/customer/Chart'));
 const ProfilePage = React.lazy(() => import('./pages/customer/Profile'));
+const DeliveryCustomers = React.lazy(() => import('./pages/delivery/DeliveryPages').then((module) => ({ default: module.DeliveryCustomers })));
+const DeliveryCustomerDetails = React.lazy(() => import('./pages/delivery/DeliveryPages').then((module) => ({ default: module.DeliveryCustomerDetails })));
+const DeliveryMilkHistory = React.lazy(() => import('./pages/delivery/DeliveryPages').then((module) => ({ default: module.DeliveryMilkHistory })));
+const MilkDeliveryAccess = React.lazy(() => import('./pages/admin/MilkDeliveryAccess'));
+const MilkDeliveryAccessDetail = React.lazy(() => import('./pages/admin/MilkDeliveryAccess').then((module) => ({ default: module.MilkDeliveryAccessDetail })));
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) return null;
   
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    const loginPath = location.pathname.startsWith('/delivery') ? '/milk-delivery/login' : '/login';
+    return <Navigate to={loginPath} replace />;
+  }
   
   if (allowedRole && user.role !== allowedRole) {
     if (user.role === 'admin') return <Navigate to="/admin" replace />;
+    if (user.role === 'milk_delivery_man') return <Navigate to="/delivery" replace />;
     if (user.role === 'worker') return <Navigate to="/worker" replace />;
     return <Navigate to="/customer/dashboard" replace />;
   }
@@ -89,6 +100,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/milk-delivery/login" element={<Navigate to="/login" replace />} />
           <Route path="/register" element={<Register />} />
           
           <Route path="/admin" element={
@@ -112,6 +124,18 @@ const App = () => {
             <Route path="workers/:workerId/attendance/:date" element={<WorkerAttendanceDetails />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="broadcast" element={<Broadcast />} />
+            <Route path="delivery-access" element={<MilkDeliveryAccess />} />
+            <Route path="delivery-access/:deliveryManId" element={<MilkDeliveryAccessDetail />} />
+          </Route>
+
+          <Route path="/delivery" element={
+            <ProtectedRoute allowedRole="milk_delivery_man">
+              <DeliveryLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<DeliveryCustomers />} />
+            <Route path="customers/:customerId" element={<DeliveryCustomerDetails />} />
+            <Route path="milk" element={<DeliveryMilkHistory />} />
           </Route>
 
           <Route path="/worker" element={

@@ -10,6 +10,7 @@ const translations = {
     payments: 'Payments',
     customers: 'Customers',
     workers: 'Workers',
+    deliveryAccess: 'Milk Delivery Access',
     expenses: 'Expenses',
     broadcaster: 'Broadcaster',
     analytics: 'Analytics',

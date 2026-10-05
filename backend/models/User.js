@@ -54,10 +54,46 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "customer", "worker"],
+      enum: ["admin", "customer", "worker", "milk_delivery_man"],
       default: "customer",
       index: true,
     },
+    deliveryPermissions: [
+      {
+        module: {
+          type: String,
+          enum: ["milk_entry", "customer_management"],
+          required: true,
+        },
+        label: {
+          type: String,
+          trim: true,
+          maxlength: 60,
+        },
+        customerLimit: {
+          type: Number,
+          min: 0,
+          default: 0,
+        },
+        canWrite: {
+          type: Boolean,
+          default: true,
+        },
+        isActive: {
+          type: Boolean,
+          default: true,
+        },
+        grantedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          default: null,
+        },
+        grantedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,

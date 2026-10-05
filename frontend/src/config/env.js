@@ -7,8 +7,16 @@
 //
 // This keeps localhost only for local development while production builds target
 // the deployed API instead of accidentally calling a local development server.
+const devFallbacks = [
+  "http://localhost:5001",
+  "http://localhost:5000",
+  "http://localhost:5002",
+];
+
 const raw =
   process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === "production" ? "https://raithupalu.onrender.com" : "http://localhost:5000");
+  (process.env.NODE_ENV === "production"
+    ? "https://raithupalu.onrender.com"
+    : devFallbacks[0]);
 
 export const API_BASE_URL = raw.replace(/\/$/, "");

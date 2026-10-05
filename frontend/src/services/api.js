@@ -134,6 +134,23 @@ export const userService = {
   delete: (id) => api.delete(`/api/users/${id}`),
 };
 
+export const deliveryService = {
+  createDeliveryUser: (data) => api.post('/api/delivery/access/users', data),
+  getDeliveryUsers: () => api.get('/api/delivery/access/users'),
+  getDeliveryUser: (deliveryManId) => api.get(`/api/delivery/access/users/${deliveryManId}`),
+  grantAccess: (deliveryManId, data) =>
+    api.post(`/api/delivery/access/users/${deliveryManId}/permissions`, data),
+  deleteDeliveryUser: (deliveryManId) => api.delete(`/api/delivery/access/users/${deliveryManId}`),
+  updateAssignments: (deliveryManId, customerIds) =>
+    api.put(`/api/delivery/access/users/${deliveryManId}/assignments`, { customerIds }),
+  getAssignedCustomers: () => api.get('/api/delivery/customers'),
+  getAssignedCustomer: (customerId) => api.get(`/api/delivery/customers/${customerId}`),
+  getMilkHistory: (customerId, params = {}) =>
+    api.get(`/api/delivery/customers/${customerId}/milk`, { params }),
+  getAllMilkHistory: (params = {}) => api.get('/api/delivery/milk', { params }),
+  createMilkEntry: (data) => api.post('/api/delivery/milk', data),
+};
+
 export const buffaloService = {
   getAll: () => api.get('/api/buffalo'),
   getById: (id) => api.get(`/api/buffalo/${id}`),

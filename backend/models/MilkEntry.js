@@ -11,6 +11,12 @@ const milkEntrySchema = new mongoose.Schema(
       required: [true, "User ID is required"],
       index: true,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
     quantity: {
       type: Number,
       required: [true, "Quantity is required"],
