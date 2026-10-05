@@ -1,9 +1,8 @@
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
 const protect = require("../middleware/authMiddleware");
 const authorizeRoles = require("../middleware/roleMiddleware");
+const { streamWorkerPhoto } = require("../utils/workerPhotoStorage");
 const {
   getWorkers,
   createWorker,
@@ -18,19 +17,8 @@ const {
 
 const router = express.Router();
 
-const workerUploadsDir = path.join(__dirname, "..", "uploads", "workers");
-if (!fs.existsSync(workerUploadsDir)) {
-  fs.mkdirSync(workerUploadsDir, { recursive: true });
-}
-
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_, __, cb) => cb(null, workerUploadsDir),
-    filename: (_, file, cb) => {
-      const safeName = `${Date.now()}-${file.originalname.replace(/\s+/g, "-")}`;
-      cb(null, safeName);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
@@ -40,6 +28,7 @@ const upload = multer({
   },
 });
 
+router.get("/photos/:photoId", streamWorkerPhoto);
 router.get("/me", protect, authorizeRoles("worker"), getMyWorkerProfile);
 router.get("/me/tasks/today", protect, authorizeRoles("worker"), getMyTaskStatus);
 router.post("/me/tasks/:taskType", protect, authorizeRoles("worker"), upload.single("photo"), submitWorkerTask);

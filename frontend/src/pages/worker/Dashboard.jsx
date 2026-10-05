@@ -13,6 +13,7 @@ const WorkerDashboard = () => {
   const [capturedPreview, setCapturedPreview] = useState('');
   const [capturedFile, setCapturedFile] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState('environment');
   const [cameraError, setCameraError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -44,7 +45,7 @@ const WorkerDashboard = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: cameraFacingMode },
           width: { ideal: 1280 },
           height: { ideal: 960 },
         },
@@ -70,7 +71,7 @@ const WorkerDashboard = () => {
         setCameraError('Camera is unavailable right now. Please try again.');
       }
     }
-  }, [stopCameraStream]);
+  }, [cameraFacingMode, stopCameraStream]);
 
   useEffect(() => {
     if (!selectedTask) {
@@ -422,7 +423,18 @@ const WorkerDashboard = () => {
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: '16px' }}>
-                  <div style={{ fontWeight: 700, color: '#163f2a', textAlign: 'center' }}>Live camera preview</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ fontWeight: 700, color: '#163f2a' }}>Live camera preview</div>
+                    <button
+                      type="button"
+                      onClick={() => setCameraFacingMode((mode) => mode === 'environment' ? 'user' : 'environment')}
+                      disabled={!cameraReady || submitting}
+                      aria-label={cameraFacingMode === 'environment' ? 'Switch to front camera' : 'Switch to rear camera'}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 10px', background: '#fff', color: '#163f2a', fontWeight: 700, cursor: cameraReady && !submitting ? 'pointer' : 'not-allowed' }}
+                    >
+                      {cameraFacingMode === 'environment' ? 'Front camera' : 'Rear camera'}
+                    </button>
+                  </div>
                   <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #dbe5e1', background: '#0f172a' }}>
                     <video
                       ref={videoRef}
@@ -435,6 +447,7 @@ const WorkerDashboard = () => {
                         objectFit: 'cover',
                         display: 'block',
                         background: '#0f172a',
+                        transform: cameraFacingMode === 'user' ? 'scaleX(-1)' : 'none',
                       }}
                     />
                   </div>

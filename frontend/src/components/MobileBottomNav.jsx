@@ -15,7 +15,8 @@ import {
   FiDollarSign,
   FiMessageSquare,
   FiLogOut,
-  FiUser
+  FiUser,
+  FiBriefcase
 } from 'react-icons/fi';
 import './MobileBottomNav.css';
 
@@ -40,13 +41,18 @@ const MobileBottomNav = ({ role = 'admin' }) => {
     navigate('/login');
   };
 
+  const isPathActive = (path, exact = false) => exact
+    ? currentPath === path
+    : currentPath === path || currentPath.startsWith(`${path}/`);
+
   // 1. Definition of core tab configurations
   const tabs = role === 'admin'
     ? [
         { path: '/admin', icon: FiHome, labelKey: 'dashboard', exact: true },
         { path: '/admin/milk', icon: FiDroplet, labelKey: 'milkEntry' },
+        { path: '/admin/customers', icon: FiUsers, labelKey: 'customers' },
+        { path: '/admin/workers', icon: FiBriefcase, labelKey: 'workers' },
         { path: '/admin/orders', icon: FiBox, labelKey: 'orders' },
-        { path: '/admin/payments', icon: FiCreditCard, labelKey: 'payments' },
       ]
     : role === 'worker'
       ? [
@@ -64,8 +70,8 @@ const MobileBottomNav = ({ role = 'admin' }) => {
   // 2. Definition of "More" sheet lists
   const moreItems = role === 'admin'
     ? [
+        { path: '/admin/payments', icon: FiCreditCard, labelKey: 'payments' },
         { path: '/admin/customers', icon: FiUsers, labelKey: 'customers' },
-        { path: '/admin/workers', icon: FiUsers, labelKey: 'workers' },
         { path: '/admin/buffalo', icon: FiActivity, labelKey: 'buffalo' },
         { path: '/admin/expenses', icon: FiDollarSign, labelKey: 'expenses' },
         { path: '/admin/broadcast', icon: FiMessageSquare, labelKey: 'broadcaster' },
@@ -87,12 +93,12 @@ const MobileBottomNav = ({ role = 'admin' }) => {
   return (
     <>
       {/* ────────────────── BOTTOM TAB DOCK ────────────────── */}
-      <div className={`mobile-bottom-dock ${isDark ? 'dark' : ''}`}>
+      <div
+        className={`mobile-bottom-dock ${isDark ? 'dark' : ''}`}
+        style={{ '--dock-columns': tabs.length + 1 }}
+      >
         {tabs.map((tab) => {
-          const isActive = tab.exact 
-            ? currentPath === tab.path 
-            : currentPath.startsWith(tab.path) && currentPath !== '/admin/broadcast';
-          
+          const isActive = isPathActive(tab.path, tab.exact);
           const Icon = tab.icon;
 
           return (
@@ -113,14 +119,14 @@ const MobileBottomNav = ({ role = 'admin' }) => {
         <button
           type="button"
           onClick={handleMoreClick}
-          className={`dock-item ${showMore ? 'active' : ''}`}
+          className={`dock-item ${showMore || moreItems.some((item) => isPathActive(item.path)) ? 'active' : ''}`}
           aria-expanded={showMore}
-          aria-label="Open secondary navigation"
+          aria-label="More navigation options"
         >
           <div className="dock-icon-wrapper">
             {role === 'admin' ? <FiGrid size={20} /> : <FiUser size={20} />}
           </div>
-          <span className="dock-label">{role === 'admin' ? translate('settings') : 'Profile'}</span>
+          <span className="dock-label">More</span>
         </button>
       </div>
 
@@ -149,13 +155,13 @@ const MobileBottomNav = ({ role = 'admin' }) => {
             >
               <div className="bottom-sheet-drag-handle" />
               <div className="bottom-sheet-header">
-                <h3>{role === 'admin' ? translate('settings') : 'Profile & Settings'}</h3>
+                <h3>More</h3>
               </div>
               
               <div className="bottom-sheet-content">
                 <div className="more-menu-grid">
                   {moreItems.map((item) => {
-                    const isActive = currentPath.startsWith(item.path);
+                    const isActive = isPathActive(item.path);
                     const Icon = item.icon;
                     return (
                       <NavLink

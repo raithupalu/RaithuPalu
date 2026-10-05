@@ -3,14 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader';
 import { PageLoading, PageError } from '../../components/PageState';
 import { workerService } from '../../services/api';
+import './WorkerDetails.css';
 
 const TASK_ORDER = ['GRAZING_START', 'LUNCH_BEFORE', 'LUNCH_AFTER', 'GRAZING_END'];
-const TASK_LABELS = {
-  GRAZING_START: 'Start Grazing',
-  LUNCH_BEFORE: 'Before Lunch',
-  LUNCH_AFTER: 'After Lunch',
-  GRAZING_END: 'End Grazing',
-};
 
 const toBusinessDateKey = (date = new Date()) => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -173,7 +168,7 @@ const WorkerDetails = () => {
     <div className="admin-page">
       <PageHeader title="Worker Details" subtitle="Daily attendance calendar and photo history" />
 
-      <div className="premium-card" style={{ padding: '24px', maxWidth: '980px', margin: '0 auto' }}>
+      <div className="premium-card worker-details-card">
         <div style={{ display: 'grid', gap: '12px', marginBottom: '24px' }}>
           <div><strong>Name:</strong> {worker.name || worker.username || '—'}</div>
           <div><strong>Phone:</strong> {worker.phone || '—'}</div>
@@ -181,39 +176,45 @@ const WorkerDetails = () => {
           <div><strong>Today's Status:</strong> {todayStatus}</div>
         </div>
 
-        <div style={{ marginBottom: '20px', padding: '18px 16px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f8fafc' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <section className="worker-calendar" aria-label="Worker attendance calendar">
+          <div className="worker-calendar-header">
             <button
               type="button"
               onClick={() => setCurrentMonth((prev) => addMonthsToKey(prev, -1))}
-              style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+              className="worker-calendar-nav"
             >
-              Previous Month
+              Previous
             </button>
 
-            <strong style={{ fontSize: '1.15rem' }}>
+            <strong className="worker-calendar-title">
               {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' }).format(new Date(`${currentMonth}-01T00:00:00+05:30`))}
             </strong>
 
             <button
               type="button"
               onClick={() => setCurrentMonth((prev) => addMonthsToKey(prev, 1))}
-              style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+              className="worker-calendar-nav"
             >
-              Next Month
+              Next
             </button>
           </div>
 
-          <div style={{ marginTop: '18px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '8px', textAlign: 'center' }}>
+          <div className="worker-calendar-grid">
+            <div className="worker-calendar-weekdays" aria-hidden="true">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} style={{ fontWeight: 700, color: '#4b5563', paddingBottom: '8px' }}>{day}</div>
+                <div key={day}>{day}</div>
               ))}
+            </div>
 
+            <div className="worker-calendar-days" aria-busy={historyLoading}>
               {calendarDays.map((day, index) => {
                 const isSelected = day.dateKey && selectedDate === day.dateKey;
                 const record = day.dateKey ? monthRecords[day.dateKey] : null;
+                const completedTasks = record
+                  ? TASK_ORDER.filter((taskKey) => Boolean(record.tasks?.[taskKey]?.completed)).length
+                  : 0;
                 const statusText = getDaySummary(record);
+                const isToday = day.dateKey && toBusinessDateKey(new Date()) === day.dateKey;
 
                 return (
                   <button
@@ -225,36 +226,22 @@ const WorkerDetails = () => {
                       navigate(`/admin/workers/${id}/attendance/${day.dateKey}`);
                     }}
                     disabled={!day.dateKey}
-                    style={{
-                      minHeight: '92px',
-                      borderRadius: '12px',
-                      border: isSelected ? '2px solid #0f766e' : '1px solid #e5e7eb',
-                      background: isSelected ? '#ecfeff' : day.inMonth ? '#fff' : '#f9fafb',
-                      padding: '8px 6px',
-                      textAlign: 'left',
-                      cursor: day.dateKey ? 'pointer' : 'default',
-                      color: '#111827',
-                      opacity: day.inMonth ? 1 : 0.5,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                    }}
+                    className={`worker-calendar-day${isSelected ? ' selected' : ''}${isToday ? ' today' : ''}${record ? ' has-record' : ''}`}
+                    aria-label={day.dateKey ? `${formatDateLabel(day.dateKey)}: ${statusText}` : undefined}
                   >
-                    <div style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{day.dateKey ? new Date(`${day.dateKey}T00:00:00+05:30`).getDate() : ''}</span>
-                      {day.dateKey && toBusinessDateKey(new Date()) === day.dateKey && (
-                        <span style={{ fontSize: '10px', background: '#dbeafe', color: '#1d4ed8', borderRadius: '999px', padding: '2px 6px' }}>Today</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#374151', fontWeight: 600 }}>
-                      {statusText}
-                    </div>
+                    {day.dateKey && <span className="worker-calendar-day-number">{day.dayNumber}</span>}
+                    {isToday && <span className="worker-calendar-today">Today</span>}
+                    {day.dateKey && (
+                      <span className="worker-calendar-status" title={statusText}>
+                        {record ? `${completedTasks}/4` : 'No log'}
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
-        </div>
+        </section>
 
         {historyLoading && (
           <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '22px' }}>

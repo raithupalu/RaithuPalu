@@ -4,6 +4,11 @@ const path = require("path");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const WorkerAttendance = require("../models/WorkerAttendance");
+const {
+  createWorkerPhotoAccessUrl,
+  deleteWorkerPhoto,
+  storeWorkerPhoto,
+} = require("../utils/workerPhotoStorage");
 
 const VALID_WORK_TYPES = ["Milk Labour", "Buffalo Keeper"];
 const TASK_SEQUENCE = ["GRAZING_START", "LUNCH_BEFORE", "LUNCH_AFTER", "GRAZING_END"];
@@ -16,7 +21,7 @@ const TASK_LABELS = {
 
 const serializeTaskDetails = (taskState = {}) => ({
   completed: Boolean(taskState?.completed),
-  photoUrl: taskState?.photoUrl || "",
+  photoUrl: createWorkerPhotoAccessUrl(taskState?.photoUrl || ""),
   timestamp: taskState?.timestamp ? new Date(taskState.timestamp).toISOString() : null,
 });
 
@@ -495,7 +500,7 @@ exports.getMyTaskStatus = async (req, res) => {
         taskKey,
         label: TASK_LABELS[taskKey],
         completed: Boolean(attendance.tasks?.[taskKey]?.completed),
-        photoUrl: attendance.tasks?.[taskKey]?.photoUrl || "",
+        photoUrl: createWorkerPhotoAccessUrl(attendance.tasks?.[taskKey]?.photoUrl || ""),
         timestamp: attendance.tasks?.[taskKey]?.timestamp || null,
         isAvailable: nextTask === taskKey && !attendance.tasks?.[taskKey]?.completed,
         isLocked: !attendance.tasks?.[taskKey]?.completed && taskKey !== nextTask,
@@ -508,6 +513,8 @@ exports.getMyTaskStatus = async (req, res) => {
 };
 
 exports.submitWorkerTask = async (req, res) => {
+  let uncommittedPhotoId = null;
+
   try {
     const worker = await User.findById(req.user.id).select("_id workType name").lean();
     if (!worker) {
@@ -523,7 +530,7 @@ exports.submitWorkerTask = async (req, res) => {
       return res.status(400).json({ message: "Invalid task type." });
     }
 
-    if (!req.file || !req.file.filename) {
+    if (!req.file || !req.file.buffer) {
       return res.status(400).json({ message: "A photo is required for this task." });
     }
 
@@ -556,7 +563,9 @@ exports.submitWorkerTask = async (req, res) => {
       });
     }
 
-    const relativePhotoPath = `/uploads/workers/${req.file.filename}`;
+    const storedPhoto = await storeWorkerPhoto(req.file);
+    uncommittedPhotoId = storedPhoto.id;
+    const relativePhotoPath = storedPhoto.photoUrl;
     record.tasks[taskType] = {
       completed: true,
       photoUrl: relativePhotoPath,
@@ -571,6 +580,7 @@ exports.submitWorkerTask = async (req, res) => {
     };
 
     await record.save();
+    uncommittedPhotoId = null;
 
     return res.status(201).json({
       message: `${TASK_LABELS[taskType]} completed successfully`,
@@ -578,16 +588,16 @@ exports.submitWorkerTask = async (req, res) => {
       attendanceStatus,
       progress: completedCount,
       total: TASK_SEQUENCE.length,
-      photoUrl: relativePhotoPath,
+      photoUrl: createWorkerPhotoAccessUrl(relativePhotoPath),
     });
   } catch (error) {
     console.error("Error submitting worker task:", error);
 
-    if (req.file && req.file.path) {
+    if (uncommittedPhotoId) {
       try {
-        fs.unlinkSync(req.file.path);
+        await deleteWorkerPhoto(uncommittedPhotoId);
       } catch (cleanupError) {
-        console.warn("Failed to clean uploaded file after task error:", cleanupError.message);
+        console.warn("Failed to clean uploaded photo after task error:", cleanupError.message);
       }
     }
 
